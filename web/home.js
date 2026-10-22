@@ -211,6 +211,7 @@
 
   function renderTop() {
     $('title').textContent = 'TV';
+    if (window.APP_VERSION) el('span', 'version', $('title'), 'v' + window.APP_VERSION);
     var tabs = $('tabs');
     tabs.innerHTML = '';
     var names = [tr('Explorar', 'Explore', 'Explorar'), tr('Filmes', 'Movies', 'Películas'), tr('Séries', 'Shows', 'Series')];

@@ -172,6 +172,13 @@ These two selection policies are deliberately different. Do not share one orderi
 
 - The title is **TV**, with the supplied `web/logo pato.png` duck image to its left. Do not restore **For You** or
   **CCCL**, or rename/remove the supplied image accidentally while packaging assets.
+- Keep a very faint version label beside **TV**: 18px, 22% opacity, inheriting the title's light/dark color.
+  The canonical fork version is `webos/appinfo.json` → `version`. The shared web builder exposes that same value
+  as `window.APP_VERSION`, so the visible label and webOS package version agree without duplicate version strings.
+- **Bump the patch version for every change set**, including UI, service, build, and documentation changes,
+  before building or committing it. One bump per coherent change set is enough; automatic preview rebuilds alone
+  do not need a bump. Never reuse a deployed version for changed sources or lower it during an upstream merge.
+  Confirm the built label matches the package version so the user can tell whether deployment succeeded.
 - Default shelf order: **Netflix, YouTube, MUBI, Spotify, Plex**, when installed. Other upstream default streaming
   services are intentionally not added to this shelf. All Apps and the shelf editor remain available for other apps.
 - Use the bundled PNG logos in `web/logos/` even when webOS cannot expose app icons. Keep the black brand tiles,

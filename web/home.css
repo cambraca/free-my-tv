@@ -103,6 +103,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   color: #1D1D1F;
 }
 
+#title .version { margin-left: 12px; font-size: 18px; font-weight: 400; letter-spacing: 0; opacity: 0.22; }
+
 #brand-logo { position: absolute; left: 80px; top: 52px; width: 82px; height: 76px; object-fit: contain; }
 .night #brand-logo { -webkit-filter: invert(1); filter: invert(1); }
 
