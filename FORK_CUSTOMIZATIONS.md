@@ -216,11 +216,20 @@ Key files: `web/index.html`, `web/home.js`, `web/home.css`, `web/data.js`, `web/
 - Keep `TV.launchPick` and pass the selected title through both featured-card and grid activation paths.
 - Resolve real Netflix/MUBI destinations from the title's TMDB watch page. Netflix needs its own numeric catalogue
   URL, never an IMDb or TMDB ID disguised as a Netflix ID.
-- On webOS, preserve Netflix's `contentTarget` plus `contentId: 'm=' + url`; Plex uses the matched library item's
-  `plex://server/...` destination. Other app/firmware versions may ignore launch parameters.
+- On webOS, Netflix receives its real `contentTarget` URL plus
+  `contentId: 'm=' + encodeURIComponent('http://api.netflix.com/catalog/titles/movies/' + netflixId) + '&source_type=4'`,
+  following [LG Connect SDK's Netflix launch implementation](https://github.com/ConnectSDK/Connect-SDK-Android-Core/blob/master/src/com/connectsdk/service/WebOSTVService.java).
+  The old `m=https://www.netflix.com/watch/...` value was the wrong format. Validate the numeric Netflix ID before
+  constructing parameters; never use IMDb/TMDB IDs as a substitute. This works with existing cached Netflix URLs.
+- Plex still attempts the matched library item's `plex://server/...` destination, and MUBI uses its actual title
+  URL, through `contentTarget`. Their installed webOS apps may ignore these targets; incoming Plex library-title
+  deep linking has not been verified. Do not invent extra Plex parameters or claim a universal working format.
 - When no exact URL is available, open the app normally and show the title-search toast instead of launching an
-  invalid target. Native title navigation remains dependent on the installed app/firmware and needs TV testing;
-  do not claim this is universally fixed merely because browser checks pass.
+  invalid target. Also retry a normal app launch if webOS rejects a targeted launch, reporting the search fallback.
+  A successful Luna launch only acknowledges the launch request, not navigation to the requested title.
+  [LG's Application Manager](https://webostv.developer.lge.com/develop/references/application-manager) passes params
+  to the receiving app; [JustWatch's webOS integration](https://apis.justwatch.com/docs/streaming_service/#lg-tv-webos)
+  likewise requires each provider's app ID and accepted target. Native title navigation needs TV testing.
 
 ## Browser preview and packaging
 

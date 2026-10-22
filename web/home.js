@@ -602,9 +602,9 @@
 
   function launcher(id, name, pick) {
     return function () {
-      function finished(ok) {
+      function finished(ok, targeted) {
         if (!ok) toast(tr('Não deu para abrir ', "Couldn't open ", 'No se pudo abrir ') + (name || id));
-        else if (pick && !pick.url) toast(tr('Procure por “' + pick.title + '” em ' + name + '.',
+        else if (pick && (!pick.url || targeted === false)) toast(tr('Procure por “' + pick.title + '” em ' + name + '.',
             'Search for “' + pick.title + '” in ' + name + '.', 'Busca “' + pick.title + '” en ' + name + '.'));
       }
       if (pick) TV.launchPick(id, pick, finished);

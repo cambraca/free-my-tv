@@ -306,11 +306,18 @@ var TV = (function () {
     },
 
     launchPick: function (id, pick, done) {
-      if (!pick.url) { this.launch(id, null, done); return; }
-      if (!webos) { this.launch(id, {contentTarget: pick.url}, done); return; }
-      if (pick.app === 'netflix') {
-        this.launch(id, {contentId: 'm=' + pick.url, contentTarget: pick.url}, done);
-      } else this.launch(id, {contentTarget: pick.url}, done);
+      var bridge = this, params = pick.url ? {contentTarget: pick.url} : null;
+      function fallback() { bridge.launch(id, null, function (ok) { if (done) done(ok, false); }); }
+      if (webos && pick.app === 'netflix') {
+        var match = /^https?:\/\/(?:www\.)?netflix\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?(?:title|watch)\/(\d+)(?:[/?#]|$)/i.exec(pick.url || '');
+        params = match ? {contentTarget: 'https://www.netflix.com/watch/' + match[1],
+          contentId: 'm=' + encodeURIComponent('http://api.netflix.com/catalog/titles/movies/' + match[1]) + '&source_type=4'} : null;
+      }
+      if (!params) { fallback(); return; }
+      this.launch(id, params, function (ok) {
+        if (!ok) fallback();
+        else if (done) done(true, true);
+      });
     },
     name: webos ? 'webos' : samsung ? 'tizen' : 'browser',
 
