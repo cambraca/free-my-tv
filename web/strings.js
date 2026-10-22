@@ -7,9 +7,15 @@ var I18N = (function () {
 
   var lang = 'en';
   var german = {
+    "Movie": "Film",
+    "TV show": "Serie",
+    "Watch trailer": "Trailer ansehen",
+    "Couldn't open trailer.": "Trailer konnte nicht geöffnet werden.",
+    "Loading details…": "Details werden geladen…",
+    "No synopsis available.": "Keine Inhaltsangabe verfügbar.",
+    "Your note": "Deine Notiz",
     "Unavailable": "Nicht verfügbar",
     "No unavailable titles.": "Keine nicht verfügbaren Titel.",
-    "Not available on Netflix, MUBI, or Plex.": "Nicht auf Netflix, MUBI oder Plex verfügbar.",
     "Refresh IMDb and Plex": "IMDb und Plex aktualisieren",
     "Refreshing…": "Wird aktualisiert…",
     "Watchlist updated.": "Merkliste aktualisiert.",
@@ -86,9 +92,15 @@ var I18N = (function () {
   }
 
   var russian = {
+    "Movie": "Фильм",
+    "TV show": "Сериал",
+    "Watch trailer": "Смотреть трейлер",
+    "Couldn't open trailer.": "Не удалось открыть трейлер.",
+    "Loading details…": "Загрузка описания…",
+    "No synopsis available.": "Описание недоступно.",
+    "Your note": "Ваша заметка",
     "Unavailable": "Недоступно",
     "No unavailable titles.": "Нет недоступных фильмов и сериалов.",
-    "Not available on Netflix, MUBI, or Plex.": "Недоступно на Netflix, MUBI и Plex.",
     "Refresh IMDb and Plex": "Обновить IMDb и Plex",
     "Refreshing…": "Обновление…",
     "Watchlist updated.": "Список обновлён.",

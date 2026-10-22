@@ -144,11 +144,11 @@
 
   // MARK: - Focus
 
-  var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit'};
+  var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', DETAILS: 'details'};
   var st = {zone: Z.SHELF, top: 0, tab: Prefs.tab(), card: 0, shelf: 0, drawer: 0, first: 0, browsing: false, grid: 0, row: 0, edit: 0};
   var cards = [];
 
-  function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT; }
+  function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.DETAILS; }
 
   function updateFocus() {
     var i, list;
@@ -474,6 +474,8 @@
   }
 
   function closeSheets() {
+    detailRequest++;
+    setClass($('details'), 'open', false);
     setClass($('apps'), 'open', false);
     setClass($('settings'), 'open', false);
     setClass($('shelfedit'), 'open', false);
@@ -645,7 +647,7 @@
       case Z.CARDS:
         var p = cards[st.card], app = p && Data.appFor(p.app);
         if (app) launcher(app.id, app.title, p)();
-        else if (p && TAB_KIND[st.tab] === 'unavailable') unavailable();
+        else if (p && TAB_KIND[st.tab] === 'unavailable') openDetails(p);
         return;
       case Z.SHELF:
         if (shelf[st.shelf]) launcher(shelf[st.shelf].id, shelf[st.shelf].title)();
@@ -653,7 +655,7 @@
       case Z.DRAWER:
         var item = browsePicks[st.drawer], service = item && Data.appFor(item.app);
         if (service) launcher(service.id, service.title, item)();
-        else if (item && TAB_KIND[st.tab] === 'unavailable') unavailable();
+        else if (item && TAB_KIND[st.tab] === 'unavailable') openDetails(item);
         return;
       case Z.APPS:
         if (others[st.grid]) launcher(others[st.grid].id, others[st.grid].title)();
@@ -663,6 +665,9 @@
         return;
       case Z.EDIT:
         editShelf(0);
+        return;
+      case Z.DETAILS:
+        if (detailPick && detailPick.trailer && Data.appFor('youtube')) playTrailer();
         return;
     }
   }
@@ -679,14 +684,78 @@
     renderDrawer();
   }
 
-  function unavailable() {
-    toast(tr('Não disponível na Netflix, MUBI ou Plex.', 'Not available on Netflix, MUBI, or Plex.',
-      'No disponible en Netflix, MUBI ni Plex.'));
+  var detailReturn = Z.CARDS, detailRequest = 0, detailPick = null;
+  function playTrailer() {
+    var app = Data.appFor('youtube');
+    if (!app || !detailPick || !detailPick.trailer) return;
+    TV.playTrailer(app.id, detailPick.trailer, function (ok) {
+      if (!ok) toast(tr('Não foi possível abrir o trailer.', "Couldn't open trailer.", 'No se pudo abrir el tráiler.'));
+    });
+  }
+
+  function renderDetails(pick, loading) {
+    var page = $('details');
+    var previous = $('detail-content'), scroll = previous ? previous.scrollTop : 0;
+    page.innerHTML = '';
+    detailPick = pick;
+    var poster = el('div', 'detail-poster', page);
+    el('div', 'detail-poster-fallback', poster, pick.title);
+    if (pick.poster) {
+      var image = el('img', '', poster);
+      image.alt = pick.title;
+      image.onerror = function () { image.style.display = 'none'; };
+      image.src = Data.image(pick.poster, 'w500');
+    }
+    if (pick.trailer && Data.appFor('youtube')) {
+      var trailer = el('button', 'detail-trailer focus', page, '▶ ' + tr('Ver trailer', 'Watch trailer', 'Ver tráiler'));
+      trailer.onclick = function () { poke(); playTrailer(); };
+    }
+    var content = el('div', 'detail-content', page);
+    content.id = 'detail-content';
+    el('div', 'detail-badge', content, pick.kind === 'tv' ? tr('Série', 'TV show', 'Serie') : tr('Filme', 'Movie', 'Película'));
+    var title = el('h2', 'detail-title', content, pick.title);
+    title.id = 'detail-title';
+    el('div', 'detail-meta', content, pick.meta || '');
+    var genres = el('div', 'detail-genres', content);
+    (pick.genres || []).forEach(function (genre) { el('span', '', genres, genre); });
+    if (pick.rating > 0) el('div', 'detail-rating', content, '★ ' + pick.rating.toFixed(1) + ' / 10 · TMDB');
+    el('p', 'detail-overview', content, pick.overview || (loading
+      ? tr('Carregando detalhes…', 'Loading details…', 'Cargando detalles…')
+      : tr('Sinopse indisponível.', 'No synopsis available.', 'Sinopsis no disponible.')));
+    if (pick.note) {
+      var note = el('div', 'detail-note', content);
+      el('div', 'detail-note-label', note, tr('Sua nota', 'Your note', 'Tu nota'));
+      el('div', '', note, pick.note);
+    }
+    content.scrollTop = scroll;
+  }
+
+  function openDetails(pick) {
+    detailReturn = st.zone;
+    var request = ++detailRequest;
+    st.zone = Z.DETAILS;
+    $('details').innerHTML = '';
+    renderDetails(pick, !pick.detailsLoaded);
+    setClass($('details'), 'open', true);
+    updateFocus();
+    Data.details(pick, function (error, detail) {
+      if (st.zone === Z.DETAILS && request === detailRequest) renderDetails(detail || pick, false);
+    });
+  }
+
+  function closeDetails() {
+    detailRequest++;
+    setClass($('details'), 'open', false);
+    st.zone = detailReturn;
+    updateFocus();
   }
 
   function move(dx, dy) {
     var tiles = $('tiles').children, cardNodes = $('cards').children;
     switch (st.zone) {
+      case Z.DETAILS:
+        $('detail-content').scrollTop += dy * 160;
+        return;
       case Z.SHELF:
         if (dx) st.shelf = Math.max(0, Math.min(shelf.length - 1, st.shelf + dx));
         else if (dy > 0) { openDrawer(); return; }
@@ -739,6 +808,7 @@
   }
 
   function back() {
+    if (st.zone === Z.DETAILS) { closeDetails(); return; }
     if (st.zone === Z.EDIT) { setClass($('shelfedit'), 'open', false); openSettings(); st.row = rowsNow.length - 2; updateFocus(); return; }
     if (sheetOpen()) { closeSheets(); return; }
     if (st.browsing) { closeDrawer(); return; }
@@ -850,6 +920,7 @@
     else if (k === TV.keys.right) move(1, 0);
     else if (k === TV.keys.up) move(0, -1);
     else if (k === TV.keys.down) move(0, 1);
+    else if ((k === 33 || k === 34) && st.zone === Z.DETAILS) $('detail-content').scrollTop += k === 34 ? 560 : -560;
     else if ((k === 33 || k === 34) && st.browsing) {
       st.zone = Z.DRAWER;
       st.drawer = Math.max(0, Math.min(browsePicks.length - 1, st.drawer + (k === 34 ? 1 : -1) * BROWSE_COLUMNS * BROWSE_ROWS));

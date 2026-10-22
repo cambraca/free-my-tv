@@ -344,6 +344,18 @@ var TV = (function () {
         else if (done) done(true, true);
       });
     },
+    playTrailer: function (id, video, done) {
+      if (!/^[a-zA-Z0-9_-]{11}$/.test(video || '')) { if (done) done(false); return; }
+      if (!webos && !samsung) {
+        var opened = window.open('https://www.youtube.com/watch?v=' + video, '_blank');
+        if (opened) opened.opener = null;
+        if (done) done(!!opened);
+        return;
+      }
+      this.launchPick(id, {app: 'youtube', url: 'https://www.youtube.com/tv?v=' + video}, function (ok, targeted) {
+        if (done) done(ok && targeted);
+      });
+    },
     name: webos ? 'webos' : samsung ? 'tizen' : 'browser',
 
     cachedApps: function () {

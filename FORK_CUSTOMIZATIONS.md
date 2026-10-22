@@ -162,8 +162,8 @@ These two selection policies are deliberately different. Do not share one orderi
   `catalogVersion: 1` migrates old snapshots by rebuilding picks from cached entries, without clearing the cache
   or forcing fresh metadata for every title. Available-title counts must exclude empty-option entries.
 - Unavailable supports both movies and shows, remembered tab/grid position, four columns and the same 12-card
-  rendering bound. Activating an unavailable title explains that it has no matching service instead of launching
-  an unrelated app. Its label and status text are translated with the rest of the web UI.
+  rendering bound. Activating an unavailable title opens its detail page instead of launching an unrelated app.
+  Its label and status text are translated with the rest of the web UI.
 
 - Featured picks reshuffle on a new load, native relaunch, or return from a hidden/background state. Use a new
   session seed, avoid the previous featured three when enough alternatives exist, and keep picks stable during
@@ -228,6 +228,20 @@ These two selection policies are deliberately different. Do not share one orderi
   response; do not fetch individual seasons or episodes. These are series totals, not counts available on a
   particular service or Plex server. Hide missing/zero counts. Old cached titles gain counts on the next normal
   metadata refresh or **Settings → Refresh IMDb and Plex**, preserving immediate startup and existing caches.
+- Unavailable title details use a large portrait poster on the left and a scrollable title, metadata, genre chips,
+  TMDB rating, synopsis, and IMDb note on the right. Keep TV-sized text and readable light/dark themes. There is
+  no Back button, no Unavailable badge, and no “not available on…” message. The remote's Back restores the exact
+  featured/grid selection; arrows, Page Up/Down, and the pointer wheel scroll the description without moving
+  the grid underneath. Ignore late detail responses after closing or selecting another title.
+- Retain poster/synopsis/genres/rating/TMDB ID in cached picks. An older cache can fetch just the selected title's
+  details on demand (exact IMDb lookup if its TMDB ID is missing), with coalesced requests and a session cache;
+  do not recrawl the watchlist or block opening the detail page. Missing artwork/synopses have graceful fallbacks.
+- Show **Watch trailer** below the poster only when an exact YouTube trailer and the installed YouTube app are
+  known. TMDB's appended `videos` response supplies validated video IDs; prefer official trailers and the selected
+  language, exclude unrelated clips/teasers, and do not scrape or autoplay the first arbitrary search result.
+  The remote's OK activates the trailer button; Back remains independent. On LG, launch YouTube with
+  `contentTarget: 'https://www.youtube.com/tv?v=' + videoId`. Native playback still needs TV verification and may
+  ask for a YouTube profile. Browser preview opens the exact trailer in a new tab.
 
 ### Settings
 

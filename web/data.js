@@ -125,6 +125,7 @@ var Data = (function () {
   // MARK: - Watchlist
 
   var SERVICES = [
+    ['youtube', 'youtube', /^youtube\.leanback\.v4$|\.TizenYouTube$/, /^youtube$/i, 'YouTube'],
     ['netflix', 'netflix', /^netflix$/, /netflix/i, 'Netflix'],
     ['mubi', 'mubi', /^com\.mubi$|^mubi$/, /mubi/i, 'MUBI'],
     ['plex', 'plex', /^cdp-30$|plex/, /plex/i, 'Plex']
@@ -290,6 +291,51 @@ var Data = (function () {
     return out;
   }
 
+  var detailCache = {}, detailPending = {};
+  function details(pick, done) {
+    if (pick.detailsLoaded && typeof pick.trailer === 'string') { done(null, pick); return; }
+    if (detailCache[pick.id]) { done(null, detailCache[pick.id]); return; }
+    if (detailPending[pick.id]) { detailPending[pick.id].push(done); return; }
+    var key = (CONFIG.tmdbKey || '').trim();
+    if (!key) { done(null, pick); return; }
+    detailPending[pick.id] = [done];
+    function finish(error, result) {
+      if (!error) detailCache[pick.id] = result;
+      var waiting = detailPending[pick.id];
+      delete detailPending[pick.id];
+      waiting.forEach(function (callback) { callback(error, result || pick); });
+    }
+    function tmdb(path, callback) {
+      var bearer = key.indexOf('eyJ') === 0;
+      get('https://api.themoviedb.org/3' + path + (path.indexOf('?') < 0 ? '?' : '&')
+        + 'language=' + encodeURIComponent(I18N.locale()) + (bearer ? '' : '&api_key=' + encodeURIComponent(key)),
+        bearer ? {Authorization: 'Bearer ' + key} : {}, callback);
+    }
+    function load(id) {
+      tmdb('/' + pick.kind + '/' + id + '?append_to_response=videos&include_video_language=en,'
+        + I18N.lang, function (error, detail) {
+        if (error) { finish(error); return; }
+        if (!detail || Number(detail.id) !== Number(id)) { finish(new Error('Title details are unavailable.')); return; }
+        var result = {};
+        for (var name in pick) if (pick.hasOwnProperty(name)) result[name] = pick[name];
+        result.poster = detail.poster_path ? 'https://image.tmdb.org/t/p/w500' + detail.poster_path : pick.poster || '';
+        result.overview = detail.overview || '';
+        result.genres = (detail.genres || []).map(function (genre) { return genre.name; });
+        result.rating = detail.vote_count > 0 ? Number(detail.vote_average) || 0 : 0;
+        result.trailer = Watchlist.trailer(detail.videos, I18N.lang);
+        result.detailsLoaded = true;
+        finish(null, result);
+      });
+    }
+    if (pick.tmdbId) { load(pick.tmdbId); return; }
+    tmdb('/find/' + pick.imdbId + '?external_source=imdb_id', function (error, found) {
+      if (error) { finish(error); return; }
+      var matches = found && found[pick.kind === 'tv' ? 'tv_results' : 'movie_results'] || [];
+      if (!matches.length) { finish(null, pick); return; }
+      load(matches[0].id);
+    });
+  }
+
   // MARK: - Formatting
 
   return {
@@ -316,6 +362,7 @@ var Data = (function () {
     },
     recsError: function () { return recsError; },
     picks: now,
+    details: details,
     catalog: catalog,
     browse: browse,
     showcase: all,

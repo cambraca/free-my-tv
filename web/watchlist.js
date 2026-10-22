@@ -66,6 +66,17 @@
     return String(value || '').replace(/\b(\d+) min\b/g, function (match, minutes) { return duration(Number(minutes)); });
   }
 
+  function trailer(videos, language) {
+    var results = videos && videos.results || [], selected = '', best = -1;
+    for (var index = 0; index < results.length; index++) {
+      var video = results[index];
+      if (video.site !== 'YouTube' || video.type !== 'Trailer' || !/^[a-zA-Z0-9_-]{11}$/.test(video.key || '')) continue;
+      var score = (video.official ? 4 : 0) + (video.iso_639_1 === String(language || 'en').split('-')[0] ? 2 : 0);
+      if (score > best) { best = score; selected = video.key; }
+    }
+    return selected;
+  }
+
   function crawl(config, request, done) {
     function graphql(query, variables, callback) {
       request('POST', 'https://api.graphql.imdb.com/', {
@@ -263,7 +274,8 @@
     var language = !config.language || config.language === 'auto' ? 'en' : config.language;
     function details(kind, item) {
       tmdb('/' + kind + '/' + item.id + '?language=' + encodeURIComponent(language)
-          + '&append_to_response=watch/providers', function (detailError, detail) {
+          + '&append_to_response=watch/providers,videos&include_video_language=en,'
+          + encodeURIComponent(language.split('-')[0]), function (detailError, detail) {
         if (detailError) { done(new Error('TMDB: ' + detailError.message)); return; }
         var providers = detail['watch/providers'], here = providers && providers.results
             && providers.results[(config.tmdbRegion || 'US').toUpperCase()];
@@ -278,6 +290,10 @@
         var backdrop = detail.backdrop_path || item.backdrop_path;
         var result = {id: item.id, kind: kind, title: detail.title || detail.name || entry.title,
           backdrop: backdrop || detail.poster_path || '', services: services, links: {},
+          poster: detail.poster_path || '', overview: detail.overview || '',
+          genres: (detail.genres || []).map(function (genre) { return genre.name; }),
+          rating: detail.vote_count > 0 ? Number(detail.vote_average) || 0 : 0,
+          trailer: trailer(detail.videos, language),
           meta: [entry.year, detail.genres && detail.genres[0] && detail.genres[0].name,
             kind === 'movie' && detail.runtime ? duration(detail.runtime) : ''].filter(Boolean).join(' · ')};
         if (kind === 'tv') {
@@ -326,6 +342,11 @@
       else backdrop = local && local.art ? plexURL(config, local.art) : entry.poster;
       picks.push({id: entry.imdbId, imdbId: entry.imdbId, kind: resolved ? resolved.kind : local ? local.kind : entry.kind,
         title: resolved && resolved.title || local && local.title || entry.title, backdrop: backdrop,
+        tmdbId: resolved && resolved.id,
+        poster: resolved && resolved.poster ? 'https://image.tmdb.org/t/p/w500' + resolved.poster : entry.poster || '',
+        overview: resolved && resolved.overview || '', genres: resolved && resolved.genres || [],
+        rating: resolved && resolved.rating || 0, detailsLoaded: !!(resolved && typeof resolved.overview === 'string'),
+        trailer: resolved && resolved.trailer,
         meta: formatMeta(resolved && resolved.meta || String(entry.year || '')), note: entry.note || '',
         seasons: resolved && resolved.seasons, episodes: resolved && resolved.episodes,
         options: options, rank: entry.rank, addedAt: entry.addedAt});
@@ -476,7 +497,7 @@
   }
 
   return {source: source, valid: valid, fresh: fresh, notesReady: notesReady, plexLinksReady: plexLinksReady,
-    availabilityReady: availabilityReady, clientSnapshot: clientSnapshot,
+    availabilityReady: availabilityReady, clientSnapshot: clientSnapshot, trailer: trailer,
     crawl: crawl, scanPlex: scanPlex, plexTarget: plexTarget, providerLinks: providerLinks,
     sync: sync, select: select, browse: browse};
 });
