@@ -60,20 +60,29 @@
 
   // MARK: - Apps on the shelf
 
-  /** Shelf apps in this order when installed, like the Android app: key, LG app id, name on the TV, brand gradient. */
+  /** Shelf apps in this order when installed, like the Android app: key, LG app id, name on the TV, primary brand color. */
   var SHELF = [
-    ['netflix', /^netflix$/, /netflix/i, ['#0A0A0A', '#000000']],
-    ['youtube', /youtube/, /^youtube$/i, ['#1C1C1E', '#09090A']],
-    ['prime', /^amazon$/, /prime video|amazon/i, ['#2AA8FF', '#0A68D4']],
-    ['disney', /disney/, /disney/i, ['#173584', '#08143F']],
-    ['max', /hbo|wbd/, /^(hbo )?max$|hbo max/i, ['#5C30E8', '#221684']],
-    ['appletv', /appletv|apple\.tv/, /apple tv/i, ['#1C1C1E', '#000000']],
-    ['hulu', /^hulu/, /hulu/i, ['#1CE783', '#0B8F4E']],
-    ['paramount', /paramount|cbs/, /paramount/i, ['#0064FF', '#002A86']],
-    ['peacock', /peacock/, /peacock/i, ['#1C1C1E', '#000000']],
-    ['globoplay', /globoplay/, /globoplay/i, ['#FF8A1F', '#FF2D5A']],
-    ['spotify', /spotify/, /spotify/i, ['#1DB954', '#0F7A36']]
+    ['netflix', /^netflix$/, /netflix/i, '#000000'],
+    ['youtube', /youtube/, /^youtube$/i, '#000000'],
+    ['mubi', /^com\.mubi$|^mubi$/, /^mubi$/i, '#000000'],
+    ['spotify', /spotify/, /spotify/i, '#000000'],
+    ['plex', /^cdp-30$|plex/, /plex/i, '#000000']
+    // ['max', /hbo|wbd/, /^(hbo )?max$|hbo max/i, '#6C3BE0'],
+    // ['prime', /^amazon$/, /prime video|amazon/i, '#00A8E1'],
+    // ['disney', /disney/, /disney/i, '#113CCF'],
+    // ['appletv', /appletv|apple\.tv/, /apple tv/i, '#000000'],
+    // ['hulu', /^hulu/, /hulu/i, '#1CE783'],
+    // ['paramount', /paramount|cbs/, /paramount/i, '#0064FF'],
+    // ['peacock', /peacock/, /peacock/i, '#000000'],
+    // ['globoplay', /globoplay/, /globoplay/i, '#FF5A1F']
   ];
+  var LOGOS = {
+    netflix: {src: 'logos/netflix.png'},
+    youtube: {src: 'logos/youtube.png'},
+    mubi: {src: 'logos/mubi.png', invert: true},
+    spotify: {src: 'logos/spotify.png'},
+    plex: {src: 'logos/plex.png'}
+  };
   var MAX_SHELF = 8;
 
   function shelfKey(app) {
@@ -96,17 +105,20 @@
   /** An app's face: its own icon on its brand color (or its name, when the icon can't be read). */
   function face(app, box, wordSize) {
     var k = shelfKey(app);
-    var top = k ? k[3][0] : app.color ? darken(app.color, 0.92) : '#2A2A2E';
-    var bottom = k ? k[3][1] : app.color ? darken(app.color, 0.62) : '#161618';
+    var color = k ? k[3] : app.color;
+    var top = color || '#2A2A2E';
+    var bottom = color ? darken(color, 0.68) : '#161618';
     box.style.background = '-webkit-linear-gradient(top, ' + top + ', ' + bottom + ')';
     box.style.background = 'linear-gradient(' + top + ', ' + bottom + ')';
     var word = el('div', 'word', box, app.title);
+    var logo = k && LOGOS[k[0]];
     if (wordSize) word.style.fontSize = wordSize + 'px';
-    if (app.icon) {
+    if (logo || app.icon) {
       var img = el('img', '', box);
       word.style.visibility = 'hidden';
       img.onerror = function () { img.parentNode.removeChild(img); word.style.visibility = ''; };
-      img.src = app.icon;
+      if (logo && logo.invert) img.style.webkitFilter = img.style.filter = 'invert(1)';
+      img.src = logo ? logo.src : app.icon;
     }
   }
 

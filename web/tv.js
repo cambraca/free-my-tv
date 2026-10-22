@@ -21,9 +21,18 @@ var TV = (function () {
     var bridge = new window.PalmServiceBridge();
     calls.push(bridge);
     var finished = false;
+    var timer = setTimeout(function () {
+      if (finished) return;
+      finished = true;
+      var index = calls.indexOf(bridge);
+      if (index >= 0) calls.splice(index, 1);
+      if (bridge.cancel) bridge.cancel();
+      if (done) done(null);
+    }, 15000);
     bridge.onservicecallback = function (message) {
       if (finished) return;
       finished = true;
+      clearTimeout(timer);
       var i = calls.indexOf(bridge);
       if (i >= 0) calls.splice(i, 1);
       var result = null;
@@ -53,11 +62,19 @@ var TV = (function () {
   var SAMSUNG_VIEWER = 'org.tizen.tv-viewer';
 
   var SAMPLE = [
-    ['netflix', 'Netflix', '#E50914'], ['youtube.leanback.v4', 'YouTube', '#FF0033'], ['amazon', 'Prime Video', '#1A98FF'],
-    ['com.disney.disneyplus-prod', 'Disney+', '#1838C8'], ['com.hbo.hbomax', 'Max', '#6C3BE0'],
-    ['com.apple.appletv', 'Apple TV', '#B8BCC6'], ['globoplaywebos', 'Globoplay', '#FF5A1F'], ['spotify-beehive', 'Spotify', '#1DB954'],
-    ['cdp-30', 'Plex', '#E5A00D'], ['com.crunchyroll.webapp', 'Crunchyroll', '#F47521'], ['com.webos.app.browser', 'Web Browser', '#3A7BD5'],
-    ['com.palm.app.settings', 'Settings', '#8E8E93']
+    ['netflix', 'Netflix', '#E50914'],
+    ['youtube.leanback.v4', 'YouTube', '#FF0000'],
+    ['com.mubi', 'MUBI', '#000000'],
+    ['spotify-beehive', 'Spotify', '#1DB954'],
+    ['cdp-30', 'Plex', '#E5A00D']
+    // ['com.wbd.stream', 'HBO Max', '#6C3BE0'],
+    // ['amazon', 'Prime Video', '#00A8E1'],
+    // ['com.disney.disneyplus-prod', 'Disney+', '#113CCF'],
+    // ['com.apple.appletv', 'Apple TV', '#000000'],
+    // ['globoplaywebos', 'Globoplay', '#FF5A1F'],
+    // ['com.crunchyroll.webapp', 'Crunchyroll', '#F47521'],
+    // ['com.webos.app.browser', 'Web Browser', '#3A7BD5'],
+    // ['com.palm.app.settings', 'Settings', '#8E8E93']
   ];
 
   var self = 'io.freemytv';
@@ -171,8 +188,11 @@ var TV = (function () {
         return;
       }
       luna('luna://com.webos.applicationManager/listLaunchPoints', {}, function (res) {
+        // Some webOS builds deny listing apps to sideloaded apps ("Denied method call listLaunchPoints") even
+        // with requiredPermissions set; launch(id) still works there, so fall back to common LG app ids.
+        if (!res) { done(SAMPLE.map(function (s) { return {id: s[0], title: s[1], icon: '', color: s[2]}; })); return; }
         var out = [];
-        var points = res && res.launchPoints ? res.launchPoints : [];
+        var points = res.launchPoints || [];
         for (var i = 0; i < points.length; i++) {
           var p = points[i];
           if (!p.id || p.id === self || HIDDEN.test(p.id)) continue;
