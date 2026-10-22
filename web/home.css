@@ -290,9 +290,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 #platter {
   position: absolute;
-  top: 814px;
-  height: 206px;
-  border-radius: 62px;
+  top: 878px;
+  height: 150px;
+  border-radius: 44px;
   background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.4));
   background: linear-gradient(rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.4));
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12), inset 0 1.5px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(255, 255, 255, 0.55);
@@ -305,8 +305,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 .tile {
   position: absolute;
-  top: 854px;
-  height: 126px;
+  top: 901px;
+  height: 104px;
   border-radius: 22px;
   overflow: hidden;
   color: #FFF;
@@ -344,7 +344,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   -webkit-transition: opacity 0.25s;
   transition: opacity 0.25s;
 }
-.tile.focus { -webkit-transform: scale(1.2); transform: scale(1.2); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34); z-index: 2; }
+.tile.focus { -webkit-transform: scale(1.12); transform: scale(1.12); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34); z-index: 2; }
 .tile.focus::after { opacity: 1; }
 .night .tile { box-shadow: 0 4px 22px rgba(0, 0, 0, 0.3); }
 .night .tile.focus { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6); }

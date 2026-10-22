@@ -312,8 +312,8 @@
   // MARK: - Shelf
 
   function renderShelf() {
-    var n = shelf.length, gap = 48, pad = 40;
-    var tw = Math.min(270, (1760 - Math.max(0, n - 1) * gap) / Math.max(1, n));
+    var n = shelf.length, gap = 32, pad = 26;
+    var tw = Math.min(220, (1760 - Math.max(0, n - 1) * gap) / Math.max(1, n));
     var width = n * tw + Math.max(0, n - 1) * gap, left = (1920 - width) / 2;
     var platter = $('platter');
     platter.style.display = n ? '' : 'none';
