@@ -288,10 +288,12 @@ var TV = (function () {
     isWebOS: webos,
     isPreview: !!window.FMTV_PREVIEW,
 
-    watchlist: function (done, force) {
+    watchlist: function (done, force, known) {
       if (!webos && window.FMTV_PREVIEW) {
         var request = new XMLHttpRequest();
-        request.open('GET', '/api/watchlist' + (force ? '?refresh=1' : ''), true);
+        var query = force ? 'refresh=1&' : '';
+        if (known) query += 'source=' + encodeURIComponent(known.source) + '&updatedAt=' + known.updatedAt;
+        request.open('GET', '/api/watchlist' + (query ? '?' + query : ''), true);
         request.timeout = 15000;
         request.onload = function () {
           var result = null;
@@ -302,7 +304,8 @@ var TV = (function () {
         request.send();
         return;
       }
-      luna('luna://io.freemytv.watchlist/get', {refresh: true, force: !!force}, done);
+      luna('luna://io.freemytv.watchlist/get', {refresh: true, force: !!force,
+        source: known ? known.source : '', updatedAt: known ? known.updatedAt : 0}, done);
     },
 
     launchPick: function (id, pick, done) {
@@ -321,6 +324,18 @@ var TV = (function () {
     },
     name: webos ? 'webos' : samsung ? 'tizen' : 'browser',
 
+    cachedApps: function () {
+      if (!webos) return [];
+      try {
+        var cached = JSON.parse(localStorage.getItem('fmtv.webosApps'));
+        if (!cached || !Array.isArray(cached.apps) || !(cached.at > 0)
+            || Date.now() < cached.at || Date.now() - cached.at >= 24 * 3600000) return [];
+        return cached.apps.filter(function (app) {
+          return app && typeof app.id === 'string' && typeof app.title === 'string' && app.id !== self && !HIDDEN.test(app.id);
+        });
+      } catch (error) { return []; }
+    },
+
     /** Installed apps, as the TV's launcher lists them: [{id, title, icon, color}]. */
     apps: function (done) {
       if (samsung) { samsungApps(done); return; }
@@ -328,6 +343,13 @@ var TV = (function () {
         done(SAMPLE.map(function (s) { return {id: s[0], title: s[1], icon: '', color: s[2]}; }));
         return;
       }
+      var complete = done;
+      done = function (apps) {
+        if (apps.length) {
+          try { localStorage.setItem('fmtv.webosApps', JSON.stringify({at: Date.now(), apps: apps})); } catch (error) {}
+        }
+        complete(apps);
+      };
       function list(res) {
         var out = [];
         var points = res && res.launchPoints ? res.launchPoints : [];

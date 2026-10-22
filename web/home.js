@@ -336,57 +336,66 @@
   // MARK: - Drawer
 
   var BROWSE_COLUMNS = 4, BROWSE_ROWS = 2, BROWSE_STEP = 326;
-  var browsePicks = [], browseWindowStamp = '';
+  var browsePicks = [], browseNodes = {}, browseRendered = null, browseFirst = -1, browseTab = -1;
   var browsePositions = [{index: 0, first: 0}, {index: 0, first: 0}, {index: 0, first: 0}];
 
   function renderDrawer() {
-    var focused = browsePicks[st.drawer], list = Data.browse(TAB_KIND[st.tab]);
+    if (!st.browsing) return;
+    var focused = browseTab === st.tab ? browsePicks[st.drawer] : null, list = Data.browse(TAB_KIND[st.tab]);
     if (focused && st.browsing) {
       for (var index = 0; index < list.length; index++) {
         if (list[index].id === focused.id) { st.drawer = index; break; }
       }
     }
     browsePicks = list;
+    browseTab = st.tab;
     st.drawer = Math.max(0, Math.min(st.drawer, list.length - 1));
     $('browse-empty').textContent = list.length ? '' : $('watchlist-status').textContent
         || tr('Nenhum título disponível.', 'No titles available.', 'No hay títulos disponibles.');
-    renderPanels();
     updateFocus();
   }
 
   function renderBrowseWindow() {
-    var firstRow = Math.max(0, st.first - 1);
+    var firstRow = st.first;
     var lastRow = Math.min(Math.ceil(browsePicks.length / BROWSE_COLUMNS), st.first + BROWSE_ROWS + 1);
     var start = firstRow * BROWSE_COLUMNS, end = Math.min(browsePicks.length, lastRow * BROWSE_COLUMNS);
-    var stamp = st.tab + ':' + start + ':' + end;
-    for (var index = start; index < end; index++) {
-      var pick = browsePicks[index];
-      stamp += JSON.stringify([pick.id, pick.title, pick.meta, pick.backdrop, pick.app, pick.url, pick.note]);
-    }
     var grid = $('browse-grid');
-    if (stamp !== browseWindowStamp) {
-      browseWindowStamp = stamp;
-      grid.innerHTML = '';
-      for (var itemIndex = start; itemIndex < end; itemIndex++) {
-        var item = browsePicks[itemIndex], card = el('div', 'browse-card', grid);
-        card.setAttribute('data-index', itemIndex);
-        card.style.left = (20 + itemIndex % BROWSE_COLUMNS * 448) + 'px';
-        card.style.top = (20 + Math.floor(itemIndex / BROWSE_COLUMNS) * BROWSE_STEP) + 'px';
-        var image = el('div', 'img', card);
-        image.style.backgroundImage = 'url(' + Data.image(item.backdrop, 'w780') + ')';
-        if (item.note) el('div', 'focus-note', image, item.note);
-        el('div', 'name', card, item.title);
-        el('div', 'meta', card, item.meta);
-        hover(card, Z.DRAWER, itemIndex);
+    if (browseRendered !== browsePicks || browseFirst !== st.first) {
+      browseRendered = browsePicks;
+      browseFirst = st.first;
+      for (var key in browseNodes) {
+        if (!browseNodes.hasOwnProperty(key)) continue;
+        var existing = browseNodes[key], existingIndex = existing.pickIndex;
+        if (existingIndex < start || existingIndex >= end || existing.pick !== browsePicks[existingIndex]) {
+          grid.removeChild(existing);
+          delete browseNodes[key];
+        }
       }
+      var fragment = document.createDocumentFragment();
+      for (var itemIndex = start; itemIndex < end; itemIndex++) {
+        var item = browsePicks[itemIndex], card = browseNodes[itemIndex];
+        if (!card) {
+          card = el('div', 'browse-card', fragment);
+          browseNodes[itemIndex] = card;
+          card.pick = item;
+          card.pickIndex = itemIndex;
+          card.setAttribute('data-index', itemIndex);
+          card.style.left = (20 + itemIndex % BROWSE_COLUMNS * 448) + 'px';
+          var image = el('div', 'img', card);
+          image.style.backgroundImage = 'url(' + Data.image(item.backdrop, 'w780') + ')';
+          if (item.note) el('div', 'focus-note', image, item.note);
+          el('div', 'name', card, item.title);
+          el('div', 'meta', card, item.meta);
+          hover(card, Z.DRAWER, itemIndex);
+        }
+        card.style.top = (20 + (Math.floor(itemIndex / BROWSE_COLUMNS) - firstRow) * BROWSE_STEP) + 'px';
+        card.style.pointerEvents = itemIndex < (st.first + BROWSE_ROWS) * BROWSE_COLUMNS ? 'auto' : 'none';
+      }
+      grid.appendChild(fragment);
     }
-    grid.style.webkitTransform = grid.style.transform = 'translateY(' + (-st.first * BROWSE_STEP) + 'px)';
     var nodes = grid.children;
     for (var nodeIndex = 0; nodeIndex < nodes.length; nodeIndex++) {
-      var pickIndex = Number(nodes[nodeIndex].getAttribute('data-index'));
-      setClass(nodes[nodeIndex], 'focus', st.zone === Z.DRAWER && pickIndex === st.drawer);
-      var row = Math.floor(pickIndex / BROWSE_COLUMNS);
-      nodes[nodeIndex].style.pointerEvents = row >= st.first && row < st.first + BROWSE_ROWS ? 'auto' : 'none';
+      setClass(nodes[nodeIndex], 'focus', st.zone === Z.DRAWER && nodes[nodeIndex].pickIndex === st.drawer);
     }
   }
 
@@ -425,7 +434,7 @@
 
   function openDrawer() {
     st.browsing = true;
-    st.zone = browsePicks.length ? Z.DRAWER : Z.SHELF;
+    st.zone = Data.browse(TAB_KIND[st.tab]).length ? Z.DRAWER : Z.SHELF;
     renderDrawer();
   }
 
@@ -728,7 +737,8 @@
 
   /** The pointer focuses what it's over (the Magic Remote, or a mouse when previewing). */
   function hover(node, zone, index) {
-    node.onmouseover = function () {
+    node.onmouseover = function (event) {
+      if (event && event.relatedTarget && node.contains(event.relatedTarget)) return;
       if (saverOn || (sheetOpen() !== (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT))) return;
       if (zone === Z.DRAWER && !st.browsing) return;
       if (zone !== Z.DRAWER && st.browsing && zone !== Z.SHELF) return;
@@ -781,7 +791,7 @@
       var p = photos.length ? photos[saverIndex++ % photos.length] : null;
       var back = front === a ? b : a;
       if (p) {
-        back.style.backgroundImage = 'url(' + Data.image(p.backdrop, 'original') + ')';
+        back.style.backgroundImage = 'url(' + Data.image(p.backdrop, 'w1280') + ')';
         back.style.webkitTransform = back.style.transform = 'scale(1.0)';
         clock.lastChild.textContent = p.title;
         setTimeout(function () {
@@ -862,19 +872,26 @@
     renderCards();
     renderShelf();
     renderDrawer();
+    renderPanels();
     renderClock();
     checkNight();
     if (st.zone === Z.SETTINGS) renderSettings();
     updateFocus();
   }
 
+  var appsAt = 0;
   function loadApps(done) {
+    if (apps.length && Date.now() - appsAt < 10 * 60000) { if (done) done(false); return; }
     TV.apps(function (list) {
-      apps = list;
-      Data.setApps(apps);
-      pickShelf();
+      appsAt = Date.now();
+      var changed = JSON.stringify(apps) !== JSON.stringify(list);
+      if (changed) {
+        apps = list;
+        Data.setApps(apps);
+        pickShelf();
+      }
       // TV.inputs(function (list2) { inputs = list2; });
-      if (done) done();
+      if (done) done(changed);
     });
   }
 
@@ -888,15 +905,18 @@
     st.drawer = 0;
     st.first = 0;
     browsePicks = [];
-    browseWindowStamp = '';
     browsePositions = [{index: 0, first: 0}, {index: 0, first: 0}, {index: 0, first: 0}];
     updateFocus();
   }
 
-  Data.onChange(function () {
-    renderWatchlistStatus();
-    renderCards();
-    renderDrawer();
+  Data.onChange(function (kind) {
+    if (document.hidden) return;
+    if (kind !== 'weather') renderWatchlistStatus();
+    if (kind === 'watchlist' || kind === 'settings') {
+      renderCards();
+      renderDrawer();
+    }
+    if (kind === 'weather' || kind === 'settings') renderPanels();
     if (st.zone === Z.SETTINGS) renderSettings();
     var status = Data.watchlistStatus();
     if (manualRefresh && !status.refreshing) {
@@ -918,6 +938,7 @@
   window.addEventListener('appcontrol', reopened);        // Samsung: the same
   var wasHidden = document.hidden;
   document.addEventListener('visibilitychange', function () {
+    Data.setActive(!document.hidden);
     if (document.hidden) { wasHidden = true; hideSaver(); return; }
     if (!wasHidden) return;
     wasHidden = false;
@@ -928,11 +949,21 @@
   I18N.set(Prefs.language());
   fit();
   renderTop();
-  loadApps(function () {
+  apps = TV.cachedApps();
+  if (apps.length) {
+    Data.setApps(apps);
+    pickShelf();
     renderAll();
-    Data.refresh();
+    setTimeout(function () {
+      loadApps(function (changed) { if (changed) renderAll(); });
+      Data.refresh();
+    }, 1500);
+  } else loadApps(function () {
+    renderAll();
+    setTimeout(function () { Data.refresh(); }, 1500);
   });
   setInterval(function () {
+    if (document.hidden) return;
     renderClock();
     checkNight();
     Data.refresh();

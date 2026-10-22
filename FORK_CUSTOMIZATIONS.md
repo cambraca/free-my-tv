@@ -123,6 +123,10 @@ Normal freshness is six hours, with throttled retries after failures; manual ref
 The preview backend uses the same matching code and private build cache. Tizen receives the bundled snapshot but
 does not have the webOS Luna background service.
 
+Automatic retries reuse a successful Plex scan for up to six hours; a manual refresh always scans it again.
+Keep the last displayed snapshot stable until a background job completes. Progress snapshots are useful only on
+the first load without cached data, and are emitted at most once every five seconds after the initial snapshot.
+
 **Settings → Refresh IMDb and Plex** must trigger a full watchlist crawl, metadata/provider refresh, and Plex scan,
 show busy/completion/error feedback, and avoid overlapping sync jobs. Keep this wired through the UI, TV bridge,
 preview endpoint (`/api/watchlist?refresh=1`), and Luna service (`force: true`).
@@ -186,8 +190,12 @@ These two selection policies are deliberately different. Do not share one orderi
 - Support remote arrows, Page Up/Down, mouse/Magic Remote wheel, and Back. Back returns to the featured page;
   moving up from the first grid row reaches the shelf. Keep focus and browsing state separate so hovering the
   shelf does not unexpectedly close the grid.
-- Render only nearby grid rows to limit image requests and TV memory use. Only fully visible rows accept pointer
-  interaction; partially visible rows must not cause runaway scrolling when hovered.
+- Render only two visible grid rows plus the following preview row: at most **12 cards**, created lazily when
+  browsing opens. Reuse overlapping cards when scrolling; do not rebuild the entire window or serialize its picks
+  on every focus move. Only fully visible rows accept pointer interaction, avoiding runaway hover scrolling.
+- Position grid cards relative to the current window, within a fixed 998px container. Rows move immediately;
+  focus scaling still animates. Do not restore a translated container whose extent grows with the list position:
+  this can create a very tall composited surface on the TV even when most titles have no DOM nodes.
 - Extract custom IMDb item notes and show them **only while the title is focused**, over its artwork on a
   translucent dark overlay with large white text. Current font sizes are 38px on the large featured card and 34px
   on the smaller featured/grid cards. Preserve TV-distance readability, wrapping/clamping, and dark-mode contrast.
@@ -210,6 +218,37 @@ the shelf editor after changing settings. Android keeps its separate native sett
 
 Key files: `web/index.html`, `web/home.js`, `web/home.css`, `web/data.js`, `web/strings.js`, `web/logos/`,
 `web/logo pato.png`.
+
+## Performance on LG webOS
+
+- Honor requested TMDB image sizes even for cached absolute `w1280` URLs: the large featured image uses `w1280`,
+  smaller cards/grid use `w780`, and the tiny background canvas uses `w300`. Screensaver images are capped at
+  `w1280`, not original resolution. Do not rewrite unrelated Plex or IMDb URLs as TMDB URLs.
+- Animate transform/opacity only. Shadows and colors change immediately; interpolating large shadows or the
+  full-screen background color causes repeated painting on older TV GPUs.
+- Separate watchlist, refresh-status, weather, and settings notifications. A status poll must not rebuild the
+  grid/weather/cards; weather updates must not invalidate the title catalogues.
+- Pass the current snapshot source and update timestamp to the Luna service and preview endpoint. An unchanged
+  snapshot returns status only. Keep catalogue objects/order stable and skip localStorage writes for unchanged
+  or in-progress data; save a completed changed snapshot once. Snapshot timestamps advance monotonically.
+- Poll active refresh jobs every 15 seconds; check idle watchlists at most every five minutes and retry a failed
+  service connection after ten minutes. Pause UI polling/rendering while hidden; the webOS service can finish its
+  background activity. Resume status checking when the app returns.
+- Paint cached content before starting startup network work (1.5-second delay). Reuse installed-app discovery
+  for ten minutes within the running app so returning from a streaming service does not wait on repeated probes.
+  Keep the last actually discovered webOS app list in `fmtv.webosApps` for up to 24 hours to paint a cold start
+  immediately, then revalidate in the background. Never seed this cache from browser sample apps or restore input
+  shortcuts from it. An unchanged discovered list must not reset the current title catalogues.
+- Limit metadata resolution to two concurrent jobs and yield between batches. Process fresh cached entries in
+  batches of 25 with one scheduled continuation, not hundreds of pending callbacks. Reuse known exact TMDB IDs
+  instead of repeating the IMDb-to-TMDB lookup on every refresh, including manual refreshes; still refresh title
+  details and provider availability. TMDB's default backdrop already prefers language-neutral images, so do not
+  download all posters/backdrops with every detail request just to select one.
+- Keep crawling every IMDb/Plex page and preserve the complete-cache/removal safeguards above. Performance is
+  not a reason to silently truncate a watchlist or treat an unreachable server as an empty library.
+
+Local browser timings are useful for regression checks, not proof of TV frame rates. Verify bounded DOM size,
+card reuse, image request sizes, stable catalogues on status polls, and no cache writes for unchanged data.
 
 ## Title-specific launch links
 

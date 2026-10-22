@@ -28,10 +28,9 @@ function refresh(force) {
   running = true;
   attemptedAt = Date.now();
   service.activityManager.create('watchlist-refresh', function (activity) {
-    Watchlist.sync(config, snapshot, request, function (partial) { snapshot = partial; }, function (err, result) {
-      running = false;
+    Watchlist.sync(config, snapshot, request, snapshot ? null : function (partial) { snapshot = partial; }, function (err, result) {
       lastError = err ? err.message : '';
-      function finished() { service.activityManager.complete(activity); }
+      function finished() { running = false; service.activityManager.complete(activity); }
       if (err) { finished(); return; }
       snapshot = result;
       fs.writeFile(target + '.tmp', JSON.stringify(result), function (writeError) {
@@ -48,9 +47,7 @@ function refresh(force) {
 service.register('get', function (message) {
   function respond() {
     if (message.payload.refresh !== false) refresh(message.payload.force === true);
-    var client = snapshot ? {schema: snapshot.schema, source: snapshot.source, updatedAt: snapshot.updatedAt,
-      entries: snapshot.entries.map(function (entry) { return entry.imdbId; }), picks: snapshot.picks,
-      warnings: snapshot.warnings} : null;
+    var client = Watchlist.clientSnapshot(snapshot, message.payload.source, message.payload.updatedAt);
     message.respond({returnValue: true, snapshot: client, refreshing: running, error: lastError});
   }
   if (loading) waiting.push(respond);

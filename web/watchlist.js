@@ -37,6 +37,13 @@
 
   function fresh(at) { return at > 0 && Date.now() >= at && Date.now() - at < TTL; }
 
+  function clientSnapshot(snapshot, knownSource, knownAt) {
+    if (!snapshot || (snapshot.source === knownSource && snapshot.updatedAt === Number(knownAt))) return null;
+    return {schema: snapshot.schema, source: snapshot.source, updatedAt: snapshot.updatedAt,
+      entries: snapshot.entries.map(function (entry) { return entry.imdbId; }), picks: snapshot.picks,
+      warnings: snapshot.warnings};
+  }
+
   function notesReady(snapshot) {
     return !!(snapshot && Array.isArray(snapshot.entries) && snapshot.entries.every(function (entry) {
       return typeof entry.note === 'string';
@@ -213,13 +220,9 @@
           bearer ? {Accept: 'application/json', Authorization: 'Bearer ' + key} : {Accept: 'application/json'}, null, callback);
     }
     var language = !config.language || config.language === 'auto' ? 'en' : config.language;
-    tmdb('/find/' + entry.imdbId + '?external_source=imdb_id&language=' + encodeURIComponent(language), function (err, found) {
-      if (err) { done(new Error('TMDB: ' + err.message)); return; }
-      var kind = found.movie_results && found.movie_results.length ? 'movie' : 'tv';
-      var item = (kind === 'movie' ? found.movie_results : found.tv_results || [])[0];
-      if (!item) { done(null, null); return; }
+    function details(kind, item) {
       tmdb('/' + kind + '/' + item.id + '?language=' + encodeURIComponent(language)
-          + '&append_to_response=watch/providers,images&include_image_language=null,en', function (detailError, detail) {
+          + '&append_to_response=watch/providers', function (detailError, detail) {
         if (detailError) { done(new Error('TMDB: ' + detailError.message)); return; }
         var providers = detail['watch/providers'], here = providers && providers.results
             && providers.results[(config.tmdbRegion || 'US').toUpperCase()];
@@ -232,10 +235,6 @@
           }
         }
         var backdrop = detail.backdrop_path || item.backdrop_path;
-        var images = detail.images && detail.images.backdrops || [];
-        for (var imageIndex = 0; imageIndex < images.length; imageIndex++) {
-          if (images[imageIndex].iso_639_1 === null) { backdrop = images[imageIndex].file_path; break; }
-        }
         var result = {id: item.id, kind: kind, title: detail.title || detail.name || entry.title,
           backdrop: backdrop || detail.poster_path || '', services: services, links: {},
           meta: [entry.year, detail.genres && detail.genres[0] && detail.genres[0].name,
@@ -248,6 +247,17 @@
               done(null, result);
             });
       });
+    }
+    if (entry.resolved && entry.resolved.id && /^(movie|tv)$/.test(entry.resolved.kind)) {
+      details(entry.resolved.kind, entry.resolved);
+      return;
+    }
+    tmdb('/find/' + entry.imdbId + '?external_source=imdb_id&language=' + encodeURIComponent(language), function (err, found) {
+      if (err) { done(new Error('TMDB: ' + err.message)); return; }
+      var kind = found.movie_results && found.movie_results.length ? 'movie' : 'tv';
+      var item = (kind === 'movie' ? found.movie_results : found.tv_results || [])[0];
+      if (!item) { done(null, null); return; }
+      details(kind, item);
     });
   }
 
@@ -279,25 +289,34 @@
 
   function sync(config, previous, request, progress, done, force) {
     previous = valid(previous, config) ? previous : null;
-    var warnings = [], entriesAt = 0;
+    var warnings = [], entriesAt = 0, snapshotAt = previous ? previous.updatedAt : 0;
+    function libraryData(callback) {
+      if (!force && previous && previous.plex && fresh(previous.plex.at)) { callback(null, previous.plex); return; }
+      scanPlex(config, request, callback);
+    }
     function match(entries) {
-      scanPlex(config, request, function (plexError, library) {
+      libraryData(function (plexError, library) {
         if (plexError) warnings.push(plexError.message);
         library = library || previous && previous.plex || {items: {}, at: 0};
-        var old = {}, entriesDone = 0, nextIndex = 0, active = 0, stopped = false;
+        var old = {}, entriesDone = 0, nextIndex = 0, active = 0, stopped = false, timer = 0, progressAt = Date.now();
         if (previous) previous.entries.forEach(function (entry) { old[entry.imdbId] = entry; });
         entries.forEach(function (entry) {
           var cached = old[entry.imdbId];
           if (cached) { entry.resolved = cached.resolved; entry.checkedAt = cached.checkedAt; }
         });
         function snapshot() {
-          return {schema: SCHEMA, source: source(config), updatedAt: Date.now(), entriesAt: entriesAt,
+          snapshotAt = Math.max(Date.now(), snapshotAt + 1);
+          return {schema: SCHEMA, source: source(config), updatedAt: snapshotAt, entriesAt: entriesAt,
             entries: entries, plex: library, picks: picksFrom(config, entries, library), warnings: warnings};
+        }
+        function schedule() {
+          if (!timer && !stopped) timer = setTimeout(function () { timer = 0; pump(); }, 50);
         }
         function pump() {
           if (stopped) return;
           if (entriesDone === entries.length) { stopped = true; done(null, snapshot()); return; }
-          while (active < 3 && nextIndex < entries.length) {
+          var batch = 0;
+          while (active < 2 && nextIndex < entries.length && batch++ < 25) {
             (function (entry) {
               active++;
               var cached = old[entry.imdbId];
@@ -308,18 +327,21 @@
                 } else { entry.resolved = result; entry.checkedAt = Date.now(); }
                 entriesDone++;
                 active--;
-                if (progress && (entriesDone % 25 === 0 || entriesDone === entries.length)) progress(snapshot());
-                setTimeout(pump, 0);
+                if (progress && Date.now() - progressAt >= 5000) {
+                  progressAt = Date.now();
+                  progress(snapshot());
+                }
+                schedule();
               }
               if (cached && fresh(cached.checkedAt) && !force) {
                 entry.resolved = cached.resolved;
                 entry.checkedAt = cached.checkedAt;
                 entriesDone++;
                 active--;
-                setTimeout(pump, 0);
               } else resolve(config, entry, request, finish);
             })(entries[nextIndex++]);
           }
+          if (active < 2 && (nextIndex < entries.length || entriesDone === entries.length)) schedule();
         }
         if (progress) progress(snapshot());
         pump();
@@ -402,6 +424,7 @@
     return list;
   }
 
-  return {source: source, valid: valid, fresh: fresh, notesReady: notesReady, crawl: crawl, scanPlex: scanPlex, providerLinks: providerLinks,
+  return {source: source, valid: valid, fresh: fresh, notesReady: notesReady, clientSnapshot: clientSnapshot,
+    crawl: crawl, scanPlex: scanPlex, providerLinks: providerLinks,
     sync: sync, select: select, browse: browse};
 });

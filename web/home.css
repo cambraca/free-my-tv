@@ -61,8 +61,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #sky .night { background: -webkit-linear-gradient(top, #1C1C1E, #0B0B0D); background: linear-gradient(#1C1C1E, #0B0B0D); opacity: 0; }
 #sky canvas { position: absolute; left: -4%; top: -4%; width: 108%; height: 108%; opacity: 0; -webkit-transition: opacity 0.8s; transition: opacity 0.8s; }
 #sky canvas.on { opacity: 1; }
-#sky .veil { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: rgba(245, 245, 247, 0.74); -webkit-transition: background-color 2s; transition: background-color 2s; }
-#sky .lift { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: #FFF; opacity: 0; -webkit-transition: opacity 0.45s, background-color 2s; transition: opacity 0.45s, background-color 2s; }
+#sky .veil { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: rgba(245, 245, 247, 0.74); }
+#sky .lift { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: #FFF; opacity: 0; -webkit-transition: opacity 0.45s; transition: opacity 0.45s; }
 .night #sky .day { opacity: 0; }
 .night #sky .night { opacity: 1; }
 .night #sky .veil { background: rgba(11, 11, 13, 0.78); }
@@ -101,8 +101,6 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   line-height: 1;
   white-space: nowrap;
   color: #1D1D1F;
-  -webkit-transition: color 2s;
-  transition: color 2s;
 }
 
 #brand-logo { position: absolute; left: 80px; top: 52px; width: 82px; height: 76px; object-fit: contain; }
@@ -120,8 +118,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   font-weight: 500;
   line-height: 68px;
   color: #6E6E73;
-  -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2), background-color 0.25s, box-shadow 0.3s, color 0.25s;
-  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2), background-color 0.25s, box-shadow 0.3s, color 0.25s;
+  -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 .tab.on { font-weight: 600; color: #1D1D1F; }
 .tab.focus {
@@ -168,8 +166,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   background: linear-gradient(rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5));
   box-shadow: 0 6px 26px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
   color: #1D1D1F;
-  -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.3s, background-color 0.25s;
-  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.3s, background-color 0.25s;
+  -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 .round .sym { position: absolute; left: 20px; top: 20px; width: 28px; height: 28px; }
 .round.focus { background: #FFF; -webkit-transform: scale(1.1); transform: scale(1.1); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24); }
@@ -219,8 +217,6 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   background-size: cover;
   background-position: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
-  -webkit-transition: box-shadow 0.32s;
-  transition: box-shadow 0.32s;
 }
 .focus-note { position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 22px 26px; color: #FFF; background: rgba(9, 11, 16, 0.82); font-size: 38px; font-weight: 500; line-height: 1.3; white-space: pre-line; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; opacity: 0; pointer-events: none; -webkit-transition: opacity 0.2s; transition: opacity 0.2s; }
 .card.focus .focus-note, .browse-card.focus .focus-note { opacity: 1; }
@@ -255,8 +251,6 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   font-weight: 600;
   letter-spacing: 0.012em;
   color: #1D1D1F;
-  -webkit-transition: color 2s;
-  transition: color 2s;
 }
 .card .meta {
   position: absolute;
@@ -319,8 +313,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   overflow: hidden;
   color: #FFF;
   box-shadow: 0 4px 22px rgba(0, 0, 0, 0.14);
-  -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.3s;
-  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.3s;
+  -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 .tile img { position: absolute; left: 50%; top: 50%; max-width: 76%; max-height: 62%; -webkit-transform: translate(-50%, -50%); transform: translate(-50%, -50%); }
 .tile .word {
@@ -371,7 +365,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 }
 
 #browse-window { position: absolute; left: 60px; top: 258px; width: 1800px; height: 782px; overflow: hidden; pointer-events: auto; }
-#browse-grid { position: absolute; left: 0; top: 0; width: 1800px; -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); }
+#browse-grid { position: absolute; left: 0; top: 0; width: 1800px; height: 998px; }
 .browse-card { position: absolute; width: 416px; height: 301px; }
 .browse-card .img { position: absolute; left: 0; top: 0; width: 416px; height: 215px; border-radius: 16px; overflow: hidden; background-color: #DADADF; background-size: cover; background-position: center; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16); -webkit-transition: -webkit-transform 0.25s; transition: transform 0.25s; }
 .browse-card.focus .img { -webkit-transform: scale(1.04); transform: scale(1.04); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.26), 0 0 0 3px #FFF; }
@@ -431,8 +425,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   border-radius: 22px;
   overflow: hidden;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
-  -webkit-transition: -webkit-transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.28s;
-  transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.28s;
+  -webkit-transition: -webkit-transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 .cell .face img { position: absolute; left: 50%; top: 50%; max-width: 70%; max-height: 60%; -webkit-transform: translate(-50%, -50%); transform: translate(-50%, -50%); }
 .cell .face .word { position: absolute; left: 6%; right: 6%; top: 50%; margin-top: -22px; height: 44px; line-height: 44px; text-align: center; font-size: 32px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #FFF; }
@@ -456,13 +450,13 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .box .title .sym { width: 36px; height: 36px; vertical-align: -5px; margin-right: 14px; color: rgba(255, 255, 255, 0.85); }
 .box .list { position: relative; overflow: hidden; }
 .box .rows { -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); }
-.box .row { position: relative; height: 70px; margin-bottom: 8px; border-radius: 20px; font-size: 30px; font-weight: 600; line-height: 70px; padding: 0 24px; white-space: nowrap; -webkit-transition: background-color 0.18s; transition: background-color 0.18s; }
+.box .row { position: relative; height: 70px; margin-bottom: 8px; border-radius: 20px; font-size: 30px; font-weight: 600; line-height: 70px; padding: 0 24px; white-space: nowrap; }
 .box .row.focus { background: rgba(255, 255, 255, 0.13); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14); }
 .box .row .value { position: absolute; right: 24px; top: 0; color: rgba(255, 255, 255, 0.92); font-weight: 500; }
 .box .row .value .chev { color: rgba(255, 255, 255, 0.35); margin: 0 10px; }
 .box .row.dim { color: rgba(255, 255, 255, 0.4); }
 .box .hint { padding: 14px 18px 0; font-size: 22px; font-weight: 500; color: rgba(255, 255, 255, 0.5); }
-.toggle { position: absolute; right: 24px; top: 13px; width: 78px; height: 44px; border-radius: 22px; background: #3A3D45; -webkit-transition: background-color 0.2s; transition: background-color 0.2s; }
+.toggle { position: absolute; right: 24px; top: 13px; width: 78px; height: 44px; border-radius: 22px; background: #3A3D45; }
 .toggle::after { content: ''; position: absolute; left: 4px; top: 4px; width: 36px; height: 36px; border-radius: 18px; background: #FFF; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); -webkit-transition: -webkit-transform 0.2s; transition: transform 0.2s; }
 .toggle.on { background: #3FD69B; }
 .toggle.on::after { -webkit-transform: translateX(34px); transform: translateX(34px); }

@@ -70,7 +70,7 @@ var Data = (function () {
   }
 
   var listeners = [];
-  function changed() { for (var i = 0; i < listeners.length; i++) listeners[i](); }
+  function changed(kind) { for (var i = 0; i < listeners.length; i++) listeners[i](kind || 'settings'); }
 
   // MARK: - Weather
 
@@ -118,7 +118,7 @@ var Data = (function () {
       weather = parseWeather(body);
       weatherAt = Date.now();
       store('weather', {place: PLACE, body: body, at: weatherAt});
-      changed();
+      changed('weather');
     });
   }
 
@@ -155,7 +155,10 @@ var Data = (function () {
   var seed = window.WATCHLIST_SEED;
   if (!Watchlist.valid(snapshot, CONFIG)) snapshot = null;
   if (Watchlist.valid(seed, CONFIG) && (!snapshot || seed.updatedAt > snapshot.updatedAt)) snapshot = seed;
+  seed = null;
+  window.WATCHLIST_SEED = null;
   var fetchingRecs = false, pollingRecs = false, pollTimer = 0, recsError = '';
+  var active = !document.hidden, nextRecsAt = 0, savedRecsAt = snapshot ? snapshot.updatedAt : 0;
   var sessionSeed = '', sessionAt = 0, catalogs = {}, browseCatalogs = {}, previousFeatured = {}, featured = {};
 
   function startSession() {
@@ -208,29 +211,37 @@ var Data = (function () {
   }
 
   function refreshRecs(force) {
-    if (fetchingRecs || !CONFIG.imdbUserId || (!TV.isWebOS && !TV.isPreview)) return;
+    if (!active || fetchingRecs || !CONFIG.imdbUserId || (!TV.isWebOS && !TV.isPreview)) return;
+    if (!force && Date.now() < nextRecsAt) return;
     if (pollTimer) { clearTimeout(pollTimer); pollTimer = 0; }
     fetchingRecs = true;
     TV.watchlist(function (result) {
+      var wasPolling = pollingRecs, previousError = recsError, updated = false;
       fetchingRecs = false;
       if (!result) {
         pollingRecs = false;
+        nextRecsAt = Date.now() + 10 * 60000;
         recsError = TV.isPreview ? 'Preview server is unavailable. Restart node tools/preview.js.'
             : 'Watchlist service is unavailable. Reinstall the updated webOS package.';
-        changed();
+        changed('status');
         return;
       }
-      if (Watchlist.valid(result.snapshot, CONFIG)) {
+      if (Watchlist.valid(result.snapshot, CONFIG) && (!snapshot || snapshot.updatedAt !== result.snapshot.updatedAt)) {
         snapshot = result.snapshot;
         catalogs = {};
         browseCatalogs = {};
-        store('watchlist', snapshot);
+        updated = true;
       }
-      recsError = result.error || snapshot && snapshot.warnings.join(' ') || '';
-      pollingRecs = result.refreshing;
-      changed();
-      if (pollingRecs) pollTimer = setTimeout(function () { refreshRecs(false); }, 5000);
-    }, force);
+      recsError = result.error || snapshot && (snapshot.warnings || []).join(' ') || '';
+      pollingRecs = !!result.refreshing;
+      if (snapshot && !pollingRecs && savedRecsAt !== snapshot.updatedAt) {
+        store('watchlist', snapshot);
+        savedRecsAt = snapshot.updatedAt;
+      }
+      nextRecsAt = Date.now() + (pollingRecs ? 15000 : 5 * 60000);
+      if (updated || force || wasPolling !== pollingRecs || previousError !== recsError) changed(updated ? 'watchlist' : 'status');
+      if (pollingRecs && active) pollTimer = setTimeout(function () { refreshRecs(false); }, 15000);
+    }, force, snapshot);
   }
 
   function all() {
@@ -251,23 +262,36 @@ var Data = (function () {
     onChange: function (fn) { listeners.push(fn); },
     setApps: function (apps) { installed = apps; catalogs = {}; browseCatalogs = {}; },
     startSession: startSession,
-    refreshWatchlist: function () { refreshRecs(true); changed(); },
+    refreshWatchlist: function () { refreshRecs(true); changed('status'); },
+    setActive: function (value) {
+      active = value;
+      if (pollTimer) { clearTimeout(pollTimer); pollTimer = 0; }
+      if (active) nextRecsAt = 0;
+    },
     appFor: appFor,
-    refresh: function () { refreshWeather(); refreshRecs(); },
+    refresh: function () { if (active) { refreshWeather(); refreshRecs(); } },
     settingsChanged: changed,
     get weather() { return weather; },
     get weatherAt() { return weatherAt; },
     watchlistStatus: function () {
       return {configured: !!CONFIG.imdbUserId, refreshing: fetchingRecs || pollingRecs,
         total: snapshot ? snapshot.entries.length : 0, available: snapshot ? snapshot.picks.length : 0,
-        loaded: !!snapshot, error: recsError || snapshot && snapshot.warnings.join(' ') || ''};
+        loaded: !!snapshot, error: recsError || snapshot && (snapshot.warnings || []).join(' ') || ''};
     },
     recsError: function () { return recsError; },
     picks: now,
     catalog: catalog,
     browse: browse,
     showcase: all,
-    image: function (path, size) { return !path ? '' : /^https?:/.test(path) ? path : 'https://image.tmdb.org/t/p/' + (size || 'w1280') + path; },
+    image: function (path, size) {
+      if (!path) return '';
+      var prefix = 'https://image.tmdb.org/t/p/';
+      size = size || 'w1280';
+      if (/^https?:\/\/image\.tmdb\.org\/t\/p\/[^/]+\//.test(path)) {
+        return path.replace(/^https?:\/\/image\.tmdb\.org\/t\/p\/[^/]+\//, prefix + size + '/');
+      }
+      return /^https?:/.test(path) ? path : prefix + size + path;
+    },
 
     /** Night at the location: from sunset to sunrise (the last forecast; without one, 6:00 and 18:00). */
     isNight: function (at) {

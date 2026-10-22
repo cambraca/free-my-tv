@@ -54,7 +54,7 @@ function refresh(force) {
   refreshing = true;
   attemptedAt = Date.now();
   const currentConfig = config, currentPath = snapshotPath;
-  Watchlist.sync(currentConfig, snapshot, request, partial => {
+  Watchlist.sync(currentConfig, snapshot, request, snapshot ? null : partial => {
     if (config === currentConfig) snapshot = partial;
   }, (error, result) => {
     refreshing = false;
@@ -87,9 +87,9 @@ const server = http.createServer((incoming, response) => {
     return;
   }
   if (pathname === '/api/watchlist') {
-    refresh(new URL(incoming.url, 'http://localhost').searchParams.get('refresh') === '1');
-    const client = snapshot ? {schema: snapshot.schema, source: snapshot.source, updatedAt: snapshot.updatedAt,
-      entries: snapshot.entries.map(entry => entry.imdbId), picks: snapshot.picks, warnings: snapshot.warnings} : null;
+    const query = new URL(incoming.url, 'http://localhost').searchParams;
+    refresh(query.get('refresh') === '1');
+    const client = Watchlist.clientSnapshot(snapshot, query.get('source'), query.get('updatedAt'));
     send(response, 200, 'application/json', JSON.stringify({returnValue: true, snapshot: client, refreshing, error: lastError}));
     return;
   }
