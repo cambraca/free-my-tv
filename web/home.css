@@ -370,8 +370,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 1.5px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
 }
 
-#browse-title { position: absolute; left: 80px; top: 270px; margin: 0; font-size: 42px; font-weight: 600; }
-#browse-window { position: absolute; left: 60px; top: 340px; width: 1800px; height: 700px; overflow: hidden; pointer-events: auto; }
+#browse-window { position: absolute; left: 60px; top: 258px; width: 1800px; height: 782px; overflow: hidden; pointer-events: auto; }
 #browse-grid { position: absolute; left: 0; top: 0; width: 1800px; -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); }
 .browse-card { position: absolute; width: 416px; height: 301px; }
 .browse-card .img { position: absolute; left: 0; top: 0; width: 416px; height: 215px; border-radius: 16px; overflow: hidden; background-color: #DADADF; background-size: cover; background-position: center; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16); -webkit-transition: -webkit-transform 0.25s; transition: transform 0.25s; }
@@ -383,15 +382,15 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night .browse-card .meta { color: rgba(245, 245, 247, 0.62); }
 #browse-empty { position: absolute; left: 20px; top: 140px; right: 20px; text-align: center; font-size: 28px; color: #6E6E73; }
 .night #browse-empty { color: rgba(245, 245, 247, 0.62); }
-#browse-weather { position: absolute; right: 80px; top: 250px; width: 490px; height: 84px; border-radius: 24px; }
-#browse-weather .place { position: absolute; left: 22px; top: 13px; max-width: 230px; font-size: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#browse-weather .condition { position: absolute; left: 22px; top: 46px; max-width: 300px; font-size: 20px; color: #6E6E73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#browse-weather .current { position: absolute; right: 20px; top: 11px; height: 40px; white-space: nowrap; }
-#browse-weather .sym { width: 28px; height: 28px; vertical-align: 0; margin-right: 10px; }
-#browse-weather .temp { font-size: 37px; font-weight: 400; line-height: 42px; }
-#browse-weather .range { position: absolute; right: 22px; top: 54px; font-size: 18px; color: #6E6E73; }
-.night #browse-weather .condition, .night #browse-weather .range { color: rgba(245, 245, 247, 0.62); }
-.night #browse-weather { background: #242428; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
+#weather-widget { position: absolute; right: 196px; top: 59px; width: 490px; height: 84px; border-radius: 24px; }
+#weather-widget .place { position: absolute; left: 22px; top: 13px; max-width: 230px; font-size: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#weather-widget .condition { position: absolute; left: 22px; top: 46px; max-width: 300px; font-size: 20px; color: #6E6E73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#weather-widget .current { position: absolute; right: 20px; top: 11px; height: 40px; white-space: nowrap; }
+#weather-widget .sym { width: 28px; height: 28px; vertical-align: 0; margin-right: 10px; }
+#weather-widget .temp { font-size: 37px; font-weight: 400; line-height: 42px; }
+#weather-widget .range { position: absolute; right: 22px; top: 54px; font-size: 18px; color: #6E6E73; }
+.night #weather-widget .condition, .night #weather-widget .range { color: rgba(245, 245, 247, 0.62); }
+.night #weather-widget { background: #242428; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
 
 /*
 #prices .coin { position: absolute; left: 34px; right: 34px; height: 40px; font-size: 29px; font-weight: 500; white-space: nowrap; }

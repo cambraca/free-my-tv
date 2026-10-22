@@ -340,7 +340,6 @@
   var browsePositions = [{index: 0, first: 0}, {index: 0, first: 0}, {index: 0, first: 0}];
 
   function renderDrawer() {
-    $('browse-title').textContent = [tr('Explorar', 'Explore', 'Explorar'), tr('Filmes', 'Movies', 'Películas'), tr('Séries', 'Shows', 'Series')][st.tab];
     var focused = browsePicks[st.drawer], list = Data.browse(TAB_KIND[st.tab]);
     if (focused && st.browsing) {
       for (var index = 0; index < list.length; index++) {
@@ -392,7 +391,7 @@
   }
 
   function renderPanels() {
-    var card = $('browse-weather');
+    var card = $('weather-widget');
     card.innerHTML = '';
     card.style.display = Prefs.weather() ? '' : 'none';
     if (!Prefs.weather()) return;
