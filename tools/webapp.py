@@ -144,10 +144,20 @@ def files(config, made_by):
 
 def preview(app, out_dir):
     """Leaves the app's files in out_dir, to open index.html in a browser."""
-    if os.path.isdir(out_dir):
-        shutil.rmtree(out_dir)
+    os.makedirs(out_dir, exist_ok=True)
     for path, content in app.items():
         target = os.path.join(out_dir, path)
         os.makedirs(os.path.dirname(target), exist_ok=True)
-        with open(target, 'wb') as f:
-            f.write(content)
+        with tempfile.NamedTemporaryFile(dir=os.path.dirname(target), prefix='.fmtv-', delete=False) as handle:
+            handle.write(content)
+            temporary = handle.name
+        os.replace(temporary, target)
+    for directory, _, names in os.walk(out_dir):
+        for name in names:
+            target = os.path.join(directory, name)
+            relative = os.path.relpath(target, out_dir).replace(os.sep, '/')
+            if relative not in app and not name.startswith('.fmtv-'):
+                try:
+                    os.remove(target)
+                except FileNotFoundError:
+                    pass
