@@ -254,7 +254,7 @@
     var same = list.length === cards.length;
     for (var i = 0; same && i < list.length; i++) same = list[i].id === cards[i].id && list[i].backdrop === cards[i].backdrop
         && list[i].meta === cards[i].meta && list[i].title === cards[i].title && list[i].app === cards[i].app
-        && list[i].url === cards[i].url;
+        && list[i].url === cards[i].url && list[i].note === cards[i].note;
     if (same && holder.children.length === list.length) return;
     cards = list;
     holder.innerHTML = '';
@@ -265,6 +265,7 @@
       card.style.width = rects[c][1] + 'px';
       var img = el('div', 'img', card);
       img.style.backgroundImage = 'url(' + Data.image(p.backdrop, c === 0 ? 'w1280' : 'w780') + ')';
+      if (p.note) el('div', 'focus-note', img, p.note);
       el('div', 'name', card, p.title);
       if (c === 0 && p.meta) el('div', 'meta', card, p.meta);
       hover(card, Z.CARDS, c);
@@ -361,7 +362,7 @@
     var stamp = st.tab + ':' + start + ':' + end;
     for (var index = start; index < end; index++) {
       var pick = browsePicks[index];
-      stamp += JSON.stringify([pick.id, pick.title, pick.meta, pick.backdrop, pick.app, pick.url]);
+      stamp += JSON.stringify([pick.id, pick.title, pick.meta, pick.backdrop, pick.app, pick.url, pick.note]);
     }
     var grid = $('browse-grid');
     if (stamp !== browseWindowStamp) {
@@ -374,6 +375,7 @@
         card.style.top = (20 + Math.floor(itemIndex / BROWSE_COLUMNS) * BROWSE_STEP) + 'px';
         var image = el('div', 'img', card);
         image.style.backgroundImage = 'url(' + Data.image(item.backdrop, 'w780') + ')';
+        if (item.note) el('div', 'focus-note', image, item.note);
         el('div', 'name', card, item.title);
         el('div', 'meta', card, item.meta);
         hover(card, Z.DRAWER, itemIndex);

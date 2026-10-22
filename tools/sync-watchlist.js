@@ -6,7 +6,7 @@ var request = require('./watchlist-network');
 var config = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 var target = process.argv[3], previous = null;
 try { previous = JSON.parse(fs.readFileSync(target, 'utf8')); } catch (err) {}
-if (Watchlist.valid(previous, config) && Watchlist.fresh(previous.updatedAt) && !previous.warnings.length) {
+if (Watchlist.valid(previous, config) && Watchlist.fresh(previous.updatedAt) && Watchlist.notesReady(previous) && !previous.warnings.length) {
   console.log('Using cached watchlist: ' + previous.entries.length + ' titles, ' + previous.picks.length + ' available.');
   process.exit(0);
 }

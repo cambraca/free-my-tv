@@ -24,7 +24,7 @@ fs.readFile(target, 'utf8', function (err, text) {
 
 function refresh(force) {
   if (running || (!force && Date.now() - attemptedAt < 10 * 60000)) return;
-  if (!force && snapshot && !snapshot.warnings.length && Watchlist.fresh(snapshot.updatedAt)) return;
+  if (!force && snapshot && !snapshot.warnings.length && Watchlist.fresh(snapshot.updatedAt) && Watchlist.notesReady(snapshot)) return;
   running = true;
   attemptedAt = Date.now();
   service.activityManager.create('watchlist-refresh', function (activity) {

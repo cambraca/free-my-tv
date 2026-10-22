@@ -11,7 +11,7 @@
   var LIST_QUERY = 'query Watchlist($userId: ID!, $first: Int!, $after: ID) {'
       + ' predefinedList(classType: WATCH_LIST, userId: $userId) {'
       + ' items(first: $first, after: $after, sort: {by: LIST_ORDER, order: DESC}) {'
-      + ' pageInfo {hasNextPage endCursor} edges {node {createdDate listItem {'
+      + ' pageInfo {hasNextPage endCursor} edges {node {createdDate description {originalText {plainText}} listItem {'
       + ' ... on Title {id titleText {text} titleType {id} releaseYear {year} primaryImage {url}}}}} } } }';
 
   function fingerprint(value) {
@@ -36,6 +36,12 @@
   }
 
   function fresh(at) { return at > 0 && Date.now() >= at && Date.now() - at < TTL; }
+
+  function notesReady(snapshot) {
+    return !!(snapshot && Array.isArray(snapshot.entries) && snapshot.entries.every(function (entry) {
+      return typeof entry.note === 'string';
+    }));
+  }
 
   function crawl(config, request, done) {
     function graphql(query, variables, callback) {
@@ -70,7 +76,8 @@
             entries.push({imdbId: title.id, title: title.titleText && title.titleText.text || title.id,
               kind: /^(tvSeries|tvMiniSeries)$/.test(type) ? 'tv' : type === 'tvEpisode' ? 'episode' : 'movie',
               year: title.releaseYear && title.releaseYear.year, addedAt: node.createdDate || '',
-              rank: entries.length, poster: title.primaryImage && title.primaryImage.url || ''});
+              rank: entries.length, poster: title.primaryImage && title.primaryImage.url || '',
+              note: (node.description && node.description.originalText && node.description.originalText.plainText || '').trim()});
           }
           var info = connection.pageInfo;
           if (!info.hasNextPage) { done(null, entries); return; }
@@ -255,7 +262,7 @@
       else backdrop = local && local.art ? plexURL(config, local.art) : entry.poster;
       picks.push({id: entry.imdbId, imdbId: entry.imdbId, kind: resolved ? resolved.kind : local.kind,
         title: resolved && resolved.title || local && local.title || entry.title, backdrop: backdrop,
-        meta: resolved && resolved.meta || String(entry.year || ''),
+        meta: resolved && resolved.meta || String(entry.year || ''), note: entry.note || '',
         options: options, rank: entry.rank, addedAt: entry.addedAt});
     }
     return picks;
@@ -310,7 +317,7 @@
       });
     }
     if (!config.imdbUserId) { done(new Error('Set imdb_user_id in config.properties.')); return; }
-    if (previous && fresh(previous.entriesAt) && !force) {
+    if (previous && fresh(previous.entriesAt) && notesReady(previous) && !force) {
       entriesAt = previous.entriesAt;
       match(previous.entries.map(function (entry) {
         var copy = {};
@@ -360,6 +367,6 @@
     });
   }
 
-  return {source: source, valid: valid, fresh: fresh, crawl: crawl, scanPlex: scanPlex, providerLinks: providerLinks,
+  return {source: source, valid: valid, fresh: fresh, notesReady: notesReady, crawl: crawl, scanPlex: scanPlex, providerLinks: providerLinks,
     sync: sync, select: select};
 });
