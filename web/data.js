@@ -156,7 +156,7 @@ var Data = (function () {
   if (!Watchlist.valid(snapshot, CONFIG)) snapshot = null;
   if (Watchlist.valid(seed, CONFIG) && (!snapshot || seed.updatedAt > snapshot.updatedAt)) snapshot = seed;
   var fetchingRecs = false, pollingRecs = false, pollTimer = 0, recsError = '';
-  var sessionSeed = '', sessionAt = 0, catalogs = {}, previousFeatured = {}, featured = {};
+  var sessionSeed = '', sessionAt = 0, catalogs = {}, browseCatalogs = {}, previousFeatured = {}, featured = {};
 
   function startSession() {
     if (sessionAt && Date.now() - sessionAt < 1000) return;
@@ -167,6 +167,7 @@ var Data = (function () {
     featured = {};
     for (var key in previousFeatured) if (previousFeatured.hasOwnProperty(key)) featured[key] = previousFeatured[key];
     catalogs = {};
+    browseCatalogs = {};
   }
 
   startSession();
@@ -196,6 +197,16 @@ var Data = (function () {
     return catalog(kind).slice(0, 3);
   }
 
+  function browse(kind) {
+    var key = kind || 'explore';
+    if (!browseCatalogs[key]) {
+      browseCatalogs[key] = Watchlist.browse(snapshot ? snapshot.picks : [], kind, function (service) {
+        return (CONFIG.watchlistServices || []).indexOf(service) >= 0 && !!appFor(service);
+      }, sessionSeed);
+    }
+    return browseCatalogs[key];
+  }
+
   function refreshRecs(force) {
     if (fetchingRecs || !CONFIG.imdbUserId || (!TV.isWebOS && !TV.isPreview)) return;
     if (pollTimer) { clearTimeout(pollTimer); pollTimer = 0; }
@@ -212,6 +223,7 @@ var Data = (function () {
       if (Watchlist.valid(result.snapshot, CONFIG)) {
         snapshot = result.snapshot;
         catalogs = {};
+        browseCatalogs = {};
         store('watchlist', snapshot);
       }
       recsError = result.error || snapshot && snapshot.warnings.join(' ') || '';
@@ -237,7 +249,7 @@ var Data = (function () {
   return {
     city: Place.city,
     onChange: function (fn) { listeners.push(fn); },
-    setApps: function (apps) { installed = apps; catalogs = {}; },
+    setApps: function (apps) { installed = apps; catalogs = {}; browseCatalogs = {}; },
     startSession: startSession,
     refreshWatchlist: function () { refreshRecs(true); changed(); },
     appFor: appFor,
@@ -253,6 +265,7 @@ var Data = (function () {
     recsError: function () { return recsError; },
     picks: now,
     catalog: catalog,
+    browse: browse,
     showcase: all,
     image: function (path, size) { return !path ? '' : /^https?:/.test(path) ? path : 'https://image.tmdb.org/t/p/' + (size || 'w1280') + path; },
 

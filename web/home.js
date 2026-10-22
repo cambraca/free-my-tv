@@ -341,7 +341,7 @@
 
   function renderDrawer() {
     $('browse-title').textContent = [tr('Explorar', 'Explore', 'Explorar'), tr('Filmes', 'Movies', 'Películas'), tr('Séries', 'Shows', 'Series')][st.tab];
-    var focused = browsePicks[st.drawer], list = Data.catalog(TAB_KIND[st.tab]);
+    var focused = browsePicks[st.drawer], list = Data.browse(TAB_KIND[st.tab]);
     if (focused && st.browsing) {
       for (var index = 0; index < list.length; index++) {
         if (list[index].id === focused.id) { st.drawer = index; break; }

@@ -376,6 +376,32 @@
     });
   }
 
+  function browse(picks, kind, available, seed) {
+    var list = select(picks, kind, available, seed, null);
+    function compareIds(left, right) {
+      var first = String(left.imdbId || left.id), second = String(right.imdbId || right.id);
+      return first < second ? -1 : first > second ? 1 : 0;
+    }
+    if (kind) {
+      return list.sort(function (left, right) {
+        var leftAt = Date.parse(left.addedAt || '') || 0, rightAt = Date.parse(right.addedAt || '') || 0;
+        return rightAt - leftAt || (left.rank || 0) - (right.rank || 0) || compareIds(left, right);
+      });
+    }
+    list.sort(compareIds);
+    var random = parseInt(fingerprint(seed + ':browse'), 16) || 88675123;
+    for (var position = list.length - 1; position > 0; position--) {
+      random ^= random << 13;
+      random ^= random >>> 17;
+      random ^= random << 5;
+      var target = Math.floor((random >>> 0) / 4294967296 * (position + 1));
+      var temporary = list[position];
+      list[position] = list[target];
+      list[target] = temporary;
+    }
+    return list;
+  }
+
   return {source: source, valid: valid, fresh: fresh, notesReady: notesReady, crawl: crawl, scanPlex: scanPlex, providerLinks: providerLinks,
-    sync: sync, select: select};
+    sync: sync, select: select, browse: browse};
 });
