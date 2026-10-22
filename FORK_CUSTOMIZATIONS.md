@@ -268,20 +268,34 @@ card reuse, image request sizes, stable catalogues on status polls, and no cache
   metadata GUID (`plex://movie/<24-hex-id>` or `plex://show/<24-hex-id>`). Retain that GUID from the library scan
   alongside the IMDb/TMDB matching GUIDs. Its handler interprets `plex://server/...` as a metadata GUID too, so
   the previous invented server URL could never identify the requested title. Plex resolves the GUID using its
-  signed-in account and connected servers; the TV app must have access to the matched server.
+  signed-in account and connected servers. This GUID approach still opened only the app on the user's TV;
+  do not restore it as the primary launch path based solely on a successful Luna response.
+- Plex now launches normally while the webOS service uses Companion's `/player/mirror/details` through the
+  configured server, following [PlexAPI's `goToMedia` implementation](https://python-plexapi.readthedocs.io/en/latest/_modules/plexapi/client.html#PlexClient.goToMedia).
+  Pass the matched local rating key, server identity/address/port, and increasing command ID. This opens a details
+  page, not autoplay. Start the service call before opening Plex and keep it alive with an ActivityManager activity,
+  so UI suspension cannot interrupt the follow-up command.
+- Discover Companion players from `/clients`, selecting exactly one LG Plex player whose advertised address
+  matches a non-loopback network interface of this TV. Never choose the first player on the server or another TV.
+  Plex must advertise a player with the `mirror` capability. Retry discovery/commands briefly while the app starts,
+  with a ten-second deadline and three-second HTTP timeouts. Tokens stay in backend headers; do not put them in
+  Luna launch parameters. A failed command uses the search fallback and logs the reason in the service.
 - `plex.linksVersion: 1` marks a scan that captured native GUIDs. Automatically rescan older nonempty libraries
   even within the usual freshness window, retaining their complete cached data if the server is unavailable.
   Preserve IMDb/metadata caches during this migration. A successful scan without native GUIDs (older agents)
   remains valid and opens Plex with a title-search fallback; do not repeatedly rescan it for missing GUIDs.
-- A selected Plex title from an old UI/build seed must not wait for an entire background sync. The Luna
-  `plexTarget` method resolves its IMDb match against the service snapshot, reusing a known native GUID or fetching
+- Preserve the legacy Luna `plexTarget` method for compatibility. It resolves its IMDb match against the service
+  snapshot, reusing a known native GUID or fetching
   only `/library/metadata/<ratingKey>?includeGuids=1` from the configured server. Verify the returned IMDb/TMDB
   identity before launching, cache the GUID in memory, and fail safely if the title was removed or Plex is offline.
   Never accept an arbitrary server URL from a launch request or expose the Plex token in launch parameters.
 - MUBI publishes an empty LG `contentTarget`, checked for *Bouchra* and *Belle* through JustWatch on 2026-10-22.
-  Its website URLs opened only the app on this TV. Open MUBI normally and report the title-search fallback;
-  do not report a website URL as successful native title navigation or invent numeric targets. Keep its web
-  URLs in the metadata for other platforms and future support.
+  Its website URLs opened only the app on this TV. At the user's explicit request, now try an **experimental**
+  numeric film-ID target: fetch the selected film's public page and read `props.pageProps.initFilm.id` from its
+  `__NEXT_DATA__` JSON, validating its slug. This is MUBI's ID, never an IMDb/TMDB ID. Cache successful lookups in
+  service memory. If lookup fails, try the URL's film slug as the target. These formats are guesses pending TV
+  testing; a launch acknowledgement cannot determine whether MUBI honored either target. Do not automatically
+  cycle through guesses after successful launches. Invalid/missing provider URLs retain the normal search fallback.
 - To recheck provider targets without contacting the TV, POST a GraphQL query to
   `https://apis.justwatch.com/graphql`, for example
   `{urlV2(fullPath:"/eg/movie/bouchra"){node{... on Movie{offers(country:EG,platform:WEB){deeplinkURL(platform:WEBOS) standardWebURL package{clearName}}}}}}`.

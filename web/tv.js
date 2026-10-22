@@ -316,19 +316,27 @@ var TV = (function () {
         params = match ? {contentTarget: '-Q m='
           + encodeURIComponent('http://api-global.netflix.com/catalog/titles/movies/' + match[1])} : null;
       } else if (webos && pick.app === 'plex') {
-        params = /^plex:\/\/(?:movie|show)\/[a-f0-9]{24}$/i.test(pick.url || '') ? {contentTarget: pick.url} : null;
-        if (!params) {
-          luna('luna://io.freemytv.watchlist/plexTarget', {imdbId: pick.imdbId || pick.id}, function (result) {
-            if (!result || !/^plex:\/\/(?:movie|show)\/[a-f0-9]{24}$/i.test(result.url || '')) { fallback(); return; }
-            bridge.launch(id, {contentTarget: result.url}, function (ok) {
-              if (!ok) fallback();
-              else if (done) done(true, true);
-            });
-          });
-          return;
-        }
+        var launched = null, navigated = null;
+        var finishedPlex = function () {
+          if (launched !== null && navigated !== null && done) done(launched, launched && navigated);
+        };
+        luna('luna://io.freemytv.watchlist/openPlex', {imdbId: pick.imdbId || pick.id}, function (result) {
+          navigated = !!result;
+          finishedPlex();
+        });
+        bridge.launch(id, null, function (ok) { launched = ok; finishedPlex(); });
+        return;
       } else if (webos && pick.app === 'mubi') {
-        params = null;
+        var film = /^https?:\/\/(?:www\.)?mubi\.com\/(?:[a-z]{2}\/)?(?:films|movies)\/([a-z0-9-]+)(?:[/?#]|$)/i.exec(pick.url || '');
+        if (!film) { fallback(); return; }
+        luna('luna://io.freemytv.watchlist/mubiTarget', {url: pick.url}, function (result) {
+          var target = result && /^\d+$/.test(result.contentTarget || '') ? result.contentTarget : film[1];
+          bridge.launch(id, {contentTarget: target}, function (ok) {
+            if (!ok) fallback();
+            else if (done) done(true, true);
+          });
+        });
+        return;
       }
       if (!params) { fallback(); return; }
       this.launch(id, params, function (ok) {

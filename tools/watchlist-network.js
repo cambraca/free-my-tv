@@ -5,7 +5,7 @@ var https = require('https');
 var url = require('url');
 var zlib = require('zlib');
 
-module.exports = function request(method, target, headers, body, done, redirects) {
+module.exports = function request(method, target, headers, body, done, redirects, timeout) {
   var options = url.parse(target), complete = false;
   options.method = method;
   options.headers = headers || {};
@@ -28,7 +28,7 @@ module.exports = function request(method, target, headers, body, done, redirects
       }
       clearTimeout(timer);
       complete = true;
-      request(method, destination, forwarded, body, done, (redirects || 0) + 1);
+      request(method, destination, forwarded, body, done, (redirects || 0) + 1, timeout);
       return;
     }
     if (response.statusCode !== 200) {
@@ -47,7 +47,9 @@ module.exports = function request(method, target, headers, body, done, redirects
       function parse(err, buffer) {
         if (err) { finish(err); return; }
         var text = buffer.toString('utf8');
-        if (/text\/html/i.test(response.headers['content-type'] || '')) { finish(null, text); return; }
+        if (/text\/html/i.test(response.headers['content-type'] || '') || /application\/xml/i.test(options.headers.Accept || '')) {
+          finish(null, text); return;
+        }
         var result;
         try { result = JSON.parse(text); } catch (parseError) { finish(new Error('Invalid JSON response')); return; }
         finish(null, result);
@@ -57,7 +59,7 @@ module.exports = function request(method, target, headers, body, done, redirects
       else parse(null, buffer);
     });
   });
-  var timer = setTimeout(function () { outgoing.abort(); finish(new Error('Request timed out')); }, 20000);
+  var timer = setTimeout(function () { outgoing.abort(); finish(new Error('Request timed out')); }, timeout || 20000);
   outgoing.on('error', function () { finish(new Error('Connection failed to ' + options.hostname)); });
   if (body) outgoing.write(body);
   outgoing.end();

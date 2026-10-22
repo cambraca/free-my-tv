@@ -4,6 +4,7 @@ var Service = require('webos-service');
 var fs = require('fs');
 var Watchlist = require('./watchlist');
 var request = require('./watchlist-network');
+var titleLaunch = require('./title-launch');
 var config = require('./config.json');
 var service = new Service('io.freemytv.watchlist');
 var target = '/media/internal/io.freemytv.watchlist.json';
@@ -59,6 +60,33 @@ service.register('plexTarget', function (message) {
   function respond() {
     Watchlist.plexTarget(config, snapshot, message.payload.imdbId, request, function (err, url) {
       message.respond({returnValue: !err, url: url || ''});
+    });
+  }
+  if (loading) waiting.push(respond);
+  else respond();
+});
+
+service.register('mubiTarget', function (message) {
+  service.activityManager.create('mubi-title', function (activity) {
+    titleLaunch.mubiTarget(message.payload.url, request, function (err, id) {
+      message.respond({returnValue: !err, contentTarget: id || ''});
+      service.activityManager.complete(activity);
+    });
+  });
+});
+
+var openingPlex = false;
+service.register('openPlex', function (message) {
+  function respond() {
+    if (openingPlex) { message.respond({returnValue: false}); return; }
+    openingPlex = true;
+    service.activityManager.create('plex-title', function (activity) {
+      titleLaunch.openPlex(config, snapshot, message.payload.imdbId, request, function (err) {
+        openingPlex = false;
+        if (err) console.warn('Plex title navigation: ' + err.message);
+        message.respond({returnValue: !err});
+        service.activityManager.complete(activity);
+      });
     });
   }
   if (loading) waiting.push(respond);
