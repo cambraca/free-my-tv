@@ -860,7 +860,7 @@
     setClass(body, 'night', Data.isNight(Date.now()));
   }
 
-  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, SAVER_AFTER = 5 * 60000;
+  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, saverFadeTimer = 0, saverStep = null, SAVER_AFTER = 5 * 60000;
 
   function showSaver() {
     if (saverOn) return;
@@ -870,7 +870,7 @@
       photos[index] = photos[target];
       photos[target] = temporary;
     }
-    saverIndex = 0;
+    saverIndex = -1;
     saverOn = true;
     var s = $('saver');
     s.innerHTML = '';
@@ -882,25 +882,31 @@
     var title = el('div', 'title', clock);
     var meta = el('div', 'meta', clock);
     var front = a;
-    function next() {
+    function next(direction) {
       if (!saverOn) return;
-      var p = photos.length ? photos[saverIndex++ % photos.length] : null;
+      clearTimeout(saverTimer);
+      clearTimeout(saverFadeTimer);
+      if (photos.length) saverIndex = (saverIndex + (direction || 1) + photos.length) % photos.length;
+      var p = photos.length ? photos[saverIndex] : null;
       var back = front === a ? b : a;
       if (p) {
         back.style.backgroundImage = 'url(' + Data.image(p.backdrop, 'w1280') + ')';
         back.style.webkitTransform = back.style.transform = 'scale(1.0)';
         title.textContent = p.title;
         meta.textContent = p.meta || '';
-        setTimeout(function () {
+        var previous = front;
+        front = back;
+        saverFadeTimer = setTimeout(function () {
+          if (!saverOn) return;
           setClass(back, 'on', true);
-          setClass(front, 'on', false);
+          setClass(previous, 'on', false);
           back.style.webkitTransform = back.style.transform = 'scale(1.08) translateX(-1.5%)';
-          front = back;
         }, 60);
       }
       tickSaverClock(clock);
       saverTimer = setTimeout(next, 12000);
     }
+    saverStep = next;
     setClass(s, 'on', true);
     next();
   }
@@ -918,6 +924,8 @@
   function hideSaver() {
     saverOn = false;
     clearTimeout(saverTimer);
+    clearTimeout(saverFadeTimer);
+    saverStep = null;
     setClass($('saver'), 'on', false);
   }
 
@@ -931,6 +939,12 @@
 
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
+    if (saverOn && (k === TV.keys.left || k === TV.keys.right)) {
+      idleAt = Date.now();
+      if (saverStep) saverStep(k === TV.keys.left ? -1 : 1);
+      e.preventDefault();
+      return;
+    }
     if (e.repeat && k === TV.keys.slideshow) { e.preventDefault(); return; }
     if (poke()) { e.preventDefault(); return; }   // the first press only wakes the screen
     if (k === TV.keys.slideshow) showSaver();
