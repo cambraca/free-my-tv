@@ -55,6 +55,8 @@
     return !!(library && (library.linksVersion === 1 || !Object.keys(library.items || {}).length));
   }
 
+  function availabilityReady(snapshot) { return !!(snapshot && snapshot.catalogVersion === 1); }
+
   function duration(minutes) {
     var hours = Math.floor(minutes / 60), remainder = minutes % 60;
     return (hours ? hours + 'h ' : '') + remainder + 'm';
@@ -313,11 +315,12 @@
         var service = resolved.services[serviceIndex];
         options.push({app: service, service: PROVIDERS[service], url: resolved.links[service] || ''});
       }
-      if (!options.length) continue;
+      if (!options.length && (!entry.checkedAt || !library.at && config.plexHost
+          && (config.watchlistServices || []).indexOf('plex') >= 0)) continue;
       var backdrop = resolved && resolved.backdrop;
       if (backdrop) backdrop = 'https://image.tmdb.org/t/p/w1280' + backdrop;
       else backdrop = local && local.art ? plexURL(config, local.art) : entry.poster;
-      picks.push({id: entry.imdbId, imdbId: entry.imdbId, kind: resolved ? resolved.kind : local.kind,
+      picks.push({id: entry.imdbId, imdbId: entry.imdbId, kind: resolved ? resolved.kind : local ? local.kind : entry.kind,
         title: resolved && resolved.title || local && local.title || entry.title, backdrop: backdrop,
         meta: formatMeta(resolved && resolved.meta || String(entry.year || '')), note: entry.note || '',
         options: options, rank: entry.rank, addedAt: entry.addedAt});
@@ -344,7 +347,7 @@
         });
         function snapshot() {
           snapshotAt = Math.max(Date.now(), snapshotAt + 1);
-          return {schema: SCHEMA, source: source(config), updatedAt: snapshotAt, entriesAt: entriesAt,
+          return {schema: SCHEMA, catalogVersion: 1, source: source(config), updatedAt: snapshotAt, entriesAt: entriesAt,
             entries: entries, plex: library, picks: picksFrom(config, entries, library), warnings: warnings};
         }
         function schedule() {
@@ -412,10 +415,15 @@
     var ranked = [];
     for (var index = 0; index < picks.length; index++) {
       var pick = picks[index];
-      if (kind && kind !== pick.kind) continue;
+      if (kind && kind !== 'unavailable' && kind !== pick.kind) continue;
       var option = null;
-      for (var optionIndex = 0; optionIndex < pick.options.length; optionIndex++) {
-        if (available(pick.options[optionIndex].app)) { option = pick.options[optionIndex]; break; }
+      if (kind === 'unavailable') {
+        if (pick.options.length) continue;
+        option = {app: '', service: '', url: ''};
+      } else {
+        for (var optionIndex = 0; optionIndex < pick.options.length; optionIndex++) {
+          if (available(pick.options[optionIndex].app)) { option = pick.options[optionIndex]; break; }
+        }
       }
       if (!option) continue;
       var hash = parseInt(fingerprint(pick.imdbId + ':' + seed + ':' + kind), 16);
@@ -462,7 +470,8 @@
     return list;
   }
 
-  return {source: source, valid: valid, fresh: fresh, notesReady: notesReady, plexLinksReady: plexLinksReady, clientSnapshot: clientSnapshot,
+  return {source: source, valid: valid, fresh: fresh, notesReady: notesReady, plexLinksReady: plexLinksReady,
+    availabilityReady: availabilityReady, clientSnapshot: clientSnapshot,
     crawl: crawl, scanPlex: scanPlex, plexTarget: plexTarget, providerLinks: providerLinks,
     sync: sync, select: select, browse: browse};
 });

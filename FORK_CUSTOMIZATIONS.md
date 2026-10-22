@@ -60,7 +60,8 @@ Key files: `web/tv.js`, `web/home.js`.
 ### Configuration and recommendation source
 
 Explore, Movies, and Shows in the web UI must come exclusively from the configured public IMDb watchlist, filtered
-to titles available on the user's configured services. Do not fall back to trending titles, general recommendations,
+to titles available on the user's configured services. A fourth tab, **Unavailable**, contains watchlist movies and
+shows with no Netflix, MUBI, or Plex match, regardless of which apps are installed. Do not fall back to trending titles, general recommendations,
 or arbitrary Plex content when the watchlist is empty, unavailable, or still loading. Show an appropriate status
 or the last valid cached watchlist instead.
 
@@ -153,6 +154,16 @@ These two selection policies are deliberately different. Do not share one orderi
 | Top three featured picks, every tab | Semi-random weighted sampling favoring recent watchlist additions and Plex. |
 | Bottom-page Explore grid | Uniform shuffle; no recency or Plex weighting. |
 | Bottom-page Movies/Shows grids | Deterministic watchlist addition date descending, newest first, with stable tie-breakers. |
+| Unavailable featured/grid | Same recency-weighted featured selection and deterministic newest-first grid as Movies/Shows; no Plex weighting. |
+
+- Keep unmatched, checked watchlist entries in snapshot `picks` with empty `options`; normal tabs exclude them,
+  and Unavailable selects only those entries. Pending/failed metadata lookups without cached results and a failed
+  initial Plex scan must not be presented as confirmed unavailable. Existing complete Plex caches survive outages.
+  `catalogVersion: 1` migrates old snapshots by rebuilding picks from cached entries, without clearing the cache
+  or forcing fresh metadata for every title. Available-title counts must exclude empty-option entries.
+- Unavailable supports both movies and shows, remembered tab/grid position, four columns and the same 12-card
+  rendering bound. Activating an unavailable title explains that it has no matching service instead of launching
+  an unrelated app. Its label and status text are translated with the rest of the web UI.
 
 - Featured picks reshuffle on a new load, native relaunch, or return from a hidden/background state. Use a new
   session seed, avoid the previous featured three when enough alternatives exist, and keep picks stable during
@@ -162,7 +173,7 @@ These two selection policies are deliberately different. Do not share one orderi
   another session in the running app, consuming that transition once across visibility/relaunch events.
 - The grid uses `Watchlist.browse` / `Data.browse`; the featured cards use their separate weighted catalogue.
   Plex is still the preferred launch provider for an Explore-grid title, even though its position is unweighted.
-- Remember the selected Explore/Movies/Shows tab across app launches. Each tab also retains its grid position
+- Remember the selected Explore/Movies/Shows/Unavailable tab across app launches. Each tab also retains its grid position
   while switching tabs in a session; do not reset the tab to Explore when reopening the app.
 - Screensaver artwork comes from the available watchlist picks, not a restored upstream trending feed.
 
@@ -191,7 +202,7 @@ These two selection policies are deliberately different. Do not share one orderi
 
 ### Two pages and TV-friendly cards
 
-- The top/featured page contains the title, three tabs, three featured titles, and app shelf. A compact weather
+- The top/featured page contains the title, four tabs, three featured titles, and app shelf. A compact weather
   widget sits immediately left of Settings at the top-right.
 - Down from the shelf opens the selected tab's larger watchlist grid. The app shelf stays pinned above it.
   The bottom page has **four columns**, no duplicate page title, and no weather widget.

@@ -7,6 +7,9 @@ var I18N = (function () {
 
   var lang = 'en';
   var german = {
+    "Unavailable": "Nicht verfügbar",
+    "No unavailable titles.": "Keine nicht verfügbaren Titel.",
+    "Not available on Netflix, MUBI, or Plex.": "Nicht auf Netflix, MUBI oder Plex verfügbar.",
     "Refresh IMDb and Plex": "IMDb und Plex aktualisieren",
     "Refreshing…": "Wird aktualisiert…",
     "Watchlist updated.": "Merkliste aktualisiert.",
@@ -81,6 +84,9 @@ var I18N = (function () {
   }
 
   var russian = {
+    "Unavailable": "Недоступно",
+    "No unavailable titles.": "Нет недоступных фильмов и сериалов.",
+    "Not available on Netflix, MUBI, or Plex.": "Недоступно на Netflix, MUBI и Plex.",
     "Refresh IMDb and Plex": "Обновить IMDb и Plex",
     "Refreshing…": "Обновление…",
     "Watchlist updated.": "Список обновлён.",

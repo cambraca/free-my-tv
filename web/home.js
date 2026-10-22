@@ -158,7 +158,7 @@
       setClass(list[i], 'focus', st.zone === Z.TOP && st.top === i);
     }
     list = $('buttons').children;
-    for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.TOP && st.top === 3 + i);
+    for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.TOP && st.top === TAB_KIND.length + i);
     // setClass($('quotes'), 'hide', st.zone === Z.TOP && st.top >= 3);
     list = $('cards').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.CARDS && st.card === i);
@@ -207,15 +207,16 @@
 
   // MARK: - Top: title, tabs, buttons, quotes
 
-  var TAB_KIND = [null, 'movie', 'tv'];
+  var TAB_KIND = [null, 'movie', 'tv', 'unavailable'];
 
   function renderTop() {
     $('title').textContent = 'TV';
     if (window.APP_VERSION) el('span', 'version', $('title'), 'v' + window.APP_VERSION);
     var tabs = $('tabs');
     tabs.innerHTML = '';
-    var names = [tr('Explorar', 'Explore', 'Explorar'), tr('Filmes', 'Movies', 'Películas'), tr('Séries', 'Shows', 'Series')];
-    for (var i = 0; i < 3; i++) {
+    var names = [tr('Explorar', 'Explore', 'Explorar'), tr('Filmes', 'Movies', 'Películas'), tr('Séries', 'Shows', 'Series'),
+      tr('Indisponíveis', 'Unavailable', 'No disponibles')];
+    for (var i = 0; i < TAB_KIND.length; i++) {
       var t = el('button', 'tab', tabs, names[i]);
       hover(t, Z.TOP, i);
     }
@@ -231,7 +232,7 @@
       r.style.left = '1772px';
       sym(defs[b][0], r);
       el('div', 'tip', r, defs[b][1]);
-      hover(r, Z.TOP, 3 + b);
+      hover(r, Z.TOP, TAB_KIND.length + b);
     }
   }
 
@@ -241,6 +242,8 @@
         'Set your IMDb user ID in config.properties.', 'Configura tu usuario de IMDb en config.properties.')
         : status.error ? status.error : status.refreshing ? tr('Atualizando sua lista…', 'Updating your watchlist…', 'Actualizando tu lista…')
         : !status.loaded ? tr('Sua lista ainda não está disponível.', 'Your watchlist is not available yet.', 'Tu lista aún no está disponible.')
+        : !Data.picks(TAB_KIND[st.tab]).length && TAB_KIND[st.tab] === 'unavailable'
+          ? tr('Nenhum título indisponível.', 'No unavailable titles.', 'No hay títulos no disponibles.')
         : !Data.picks(TAB_KIND[st.tab]).length ? tr('Nenhum título da sua lista disponível nestes serviços.',
             'No watchlist titles available on your services in this tab.', 'No hay títulos de tu lista disponibles en estos servicios.') : '';
     $('watchlist-status').textContent = message;
@@ -338,7 +341,7 @@
 
   var BROWSE_COLUMNS = 4, BROWSE_ROWS = 2, BROWSE_STEP = 326;
   var browsePicks = [], browseNodes = {}, browseRendered = null, browseFirst = -1, browseTab = -1;
-  var browsePositions = [{index: 0, first: 0}, {index: 0, first: 0}, {index: 0, first: 0}];
+  var browsePositions = TAB_KIND.map(function () { return {index: 0, first: 0}; });
 
   function renderDrawer() {
     if (!st.browsing) return;
@@ -636,12 +639,13 @@
   function activate() {
     switch (st.zone) {
       case Z.TOP:
-        if (st.top < 3) return;
+        if (st.top < TAB_KIND.length) return;
         openSettings();
         return;
       case Z.CARDS:
         var p = cards[st.card], app = p && Data.appFor(p.app);
         if (app) launcher(app.id, app.title, p)();
+        else if (p && TAB_KIND[st.tab] === 'unavailable') unavailable();
         return;
       case Z.SHELF:
         if (shelf[st.shelf]) launcher(shelf[st.shelf].id, shelf[st.shelf].title)();
@@ -649,6 +653,7 @@
       case Z.DRAWER:
         var item = browsePicks[st.drawer], service = item && Data.appFor(item.app);
         if (service) launcher(service.id, service.title, item)();
+        else if (item && TAB_KIND[st.tab] === 'unavailable') unavailable();
         return;
       case Z.APPS:
         if (others[st.grid]) launcher(others[st.grid].id, others[st.grid].title)();
@@ -674,6 +679,11 @@
     renderDrawer();
   }
 
+  function unavailable() {
+    toast(tr('Não disponível na Netflix, MUBI ou Plex.', 'Not available on Netflix, MUBI, or Plex.',
+      'No disponible en Netflix, MUBI ni Plex.'));
+  }
+
   function move(dx, dy) {
     var tiles = $('tiles').children, cardNodes = $('cards').children;
     switch (st.zone) {
@@ -693,10 +703,10 @@
         break;
       case Z.TOP:
         if (dx) {
-          st.top = Math.max(0, Math.min(3, st.top + dx));
-          if (st.top < 3) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
+          st.top = Math.max(0, Math.min(TAB_KIND.length, st.top + dx));
+          if (st.top < TAB_KIND.length) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
         } else if (dy > 0) {
-          if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < 3 ? 0 : cards.length - 1); }
+          if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < TAB_KIND.length ? 0 : cards.length - 1); }
           else st.zone = Z.SHELF;
         }
         break;
@@ -744,7 +754,7 @@
       if (zone === Z.DRAWER && !st.browsing) return;
       if (zone !== Z.DRAWER && st.browsing && zone !== Z.SHELF) return;
       st.zone = zone;
-      if (zone === Z.TOP) { st.top = index; if (index < 3) selectTab(index); }
+      if (zone === Z.TOP) { st.top = index; if (index < TAB_KIND.length) selectTab(index); }
       else if (zone === Z.CARDS) st.card = index;
       else if (zone === Z.SHELF) st.shelf = index;
       else if (zone === Z.DRAWER) st.drawer = index;
@@ -905,7 +915,7 @@
     st.drawer = 0;
     st.first = 0;
     browsePicks = [];
-    browsePositions = [{index: 0, first: 0}, {index: 0, first: 0}, {index: 0, first: 0}];
+    browsePositions = TAB_KIND.map(function () { return {index: 0, first: 0}; });
     updateFocus();
   }
 

@@ -38,7 +38,7 @@ var Prefs = (function () {
     temperature: function () { return pick('temperature', CONFIG.temperature || 'auto'); },
     theme: function () { return pick('theme', 'auto'); },
     weather: function () { return pick('weather', true); },
-    tab: function () { return Math.max(0, Math.min(2, Math.floor(Number(pick('tab', 0)) || 0))); },
+    tab: function () { return Math.max(0, Math.min(3, Math.floor(Number(pick('tab', 0)) || 0))); },
     shelf: function () { return pick('shelf', null); },
     set: function (name, value) { v[name] = value; save(); this.version++; }
   };
@@ -289,7 +289,8 @@ var Data = (function () {
     get weatherAt() { return weatherAt; },
     watchlistStatus: function () {
       return {configured: !!CONFIG.imdbUserId, refreshing: fetchingRecs || pollingRecs,
-        total: snapshot ? snapshot.entries.length : 0, available: snapshot ? snapshot.picks.length : 0,
+        total: snapshot ? snapshot.entries.length : 0,
+        available: snapshot ? snapshot.picks.filter(function (pick) { return pick.options.length > 0; }).length : 0,
         loaded: !!snapshot, error: recsError || snapshot && (snapshot.warnings || []).join(' ') || ''};
     },
     recsError: function () { return recsError; },
