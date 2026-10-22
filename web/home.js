@@ -122,7 +122,8 @@
     }
   }
 
-  var apps = [], shelf = [], others = [], inputs = [];
+  var apps = [], shelf = [], others = [];
+  // var inputs = [];
 
   function pickShelf() {
     var chosen = Prefs.shelf(), out = [];
@@ -214,11 +215,14 @@
     }
     var buttons = $('buttons');
     buttons.innerHTML = '';
-    var defs = [['live_tv', tr('TV aberta', 'Live TV', 'TV en vivo')], ['hdmi', tr('Entradas HDMI', 'HDMI Inputs', 'Entradas HDMI')],
-      ['settings', tr('Ajustes', 'Settings', 'Ajustes')]];
-    for (var b = 0; b < 3; b++) {
-      var r = el('button', 'round' + (b === 2 ? ' last' : ''), buttons);
-      r.style.left = (1596 + 88 * b) + 'px';
+    var defs = [
+      // ['live_tv', tr('TV aberta', 'Live TV', 'TV en vivo')],
+      // ['hdmi', tr('Entradas HDMI', 'HDMI Inputs', 'Entradas HDMI')],
+      ['settings', tr('Ajustes', 'Settings', 'Ajustes')]
+    ];
+    for (var b = 0; b < defs.length; b++) {
+      var r = el('button', 'round last', buttons);
+      r.style.left = '1772px';
       sym(defs[b][0], r);
       el('div', 'tip', r, defs[b][1]);
       hover(r, Z.TOP, 3 + b);
@@ -331,10 +335,6 @@
     var d = $('drawer');
     d.innerHTML = '';
     drawerItems = [];
-    for (var i = 0; i < inputs.length; i++) {
-      var x = inputs[i];
-      drawerItems.push({label: x.label || tr('TV aberta', 'Live TV', 'TV en vivo'), symbol: x.symbol, off: !x.connected, run: launcher(x.id, x.label)});
-    }
     drawerInputs = drawerItems.length;
     drawerItems.push({label: tr('Todos os Apps', 'All Apps', 'Todas las apps'), symbol: 'apps', run: openApps});
     drawerItems.push({label: tr('Ajustes do Início', 'Home Settings', 'Ajustes de inicio'), symbol: 'settings', run: openSettings});
@@ -611,18 +611,16 @@
     });
   }
 
-  function liveTV() {
-    for (var i = 0; i < inputs.length; i++) if (inputs[i].key === 'live') return inputs[i];
-    return null;
-  }
+  // function liveTV() {
+  //   for (var index = 0; index < inputs.length; index++) if (inputs[index].key === 'live') return inputs[index];
+  //   return null;
+  // }
 
   function activate() {
     switch (st.zone) {
       case Z.TOP:
         if (st.top < 3) return;
-        if (st.top === 3) { var live = liveTV(); if (live) launcher(live.id, tr('TV aberta', 'Live TV', 'TV en vivo'))(); }
-        else if (st.top === 4) { st.zone = Z.SHELF; openDrawer(); st.drawer = 1 < drawerInputs ? 1 : 0; updateFocus(); }
-        else openSettings();
+        openSettings();
         return;
       case Z.CARDS:
         var p = cards[st.card], app = p && Data.appFor(p.app);
@@ -670,7 +668,7 @@
         break;
       case Z.TOP:
         if (dx) {
-          st.top = Math.max(0, Math.min(5, st.top + dx));
+          st.top = Math.max(0, Math.min(3, st.top + dx));
           if (st.top < 3) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
         } else if (dy > 0) {
           if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < 3 ? 0 : cards.length - 1); }
@@ -839,10 +837,8 @@
       apps = list;
       Data.setApps(apps);
       pickShelf();
-      TV.inputs(function (list2) {
-        inputs = list2;
-        if (done) done();
-      });
+      // TV.inputs(function (list2) { inputs = list2; });
+      if (done) done();
     });
   }
 
