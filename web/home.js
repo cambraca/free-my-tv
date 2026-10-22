@@ -469,7 +469,10 @@
 
   // MARK: - Home Settings
 
+  var manualRefresh = false;
+
   function settingRows() {
+    var watchlist = Data.watchlistStatus();
     var lang = Prefs.language(), unit = Prefs.temperature(), theme = Prefs.theme();
     var auto = tr('Automático', 'Automatic', 'Automático'), on = tr('Ligado', 'On', 'Activado'), off = tr('Desligado', 'Off', 'Desactivado');
     var rows = [
@@ -484,6 +487,11 @@
       // {label: tr('Widget de cotações', 'Quotes widget', 'Widget de cotizaciones'), toggle: Prefs.quotes(),
       //   step: function () { Prefs.set('quotes', !Prefs.quotes()); Data.settingsChanged(); }}
     ];
+    rows.push({label: tr('Atualizar IMDb e Plex', 'Refresh IMDb and Plex', 'Actualizar IMDb y Plex'),
+      value: watchlist.refreshing ? tr('Atualizando…', 'Refreshing…', 'Actualizando…') : '›', dim: watchlist.refreshing,
+      step: function () {
+        if (!Data.watchlistStatus().refreshing) { manualRefresh = true; Data.refreshWatchlist(); }
+      }});
     rows.push({label: tr('Todos os Apps', 'All Apps', 'Todas las apps'), value: '›', step: function (d) { if (d >= 0) openApps(); }});
     rows.push({label: tr('Prateleira', 'Shelf', 'Estante'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('Ajustes da TV', 'TV Settings', 'Ajustes del TV'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
@@ -895,6 +903,11 @@
     renderCards();
     renderDrawer();
     if (st.zone === Z.SETTINGS) renderSettings();
+    var status = Data.watchlistStatus();
+    if (manualRefresh && !status.refreshing) {
+      manualRefresh = false;
+      toast(status.error || tr('Lista atualizada.', 'Watchlist updated.', 'Lista actualizada.'));
+    }
     checkNight();
   });
 

@@ -181,10 +181,10 @@ var TV = (function () {
     isWebOS: webos,
     isPreview: !!window.FMTV_PREVIEW,
 
-    watchlist: function (done) {
+    watchlist: function (done, force) {
       if (!webos && window.FMTV_PREVIEW) {
         var request = new XMLHttpRequest();
-        request.open('GET', '/api/watchlist', true);
+        request.open('GET', '/api/watchlist' + (force ? '?refresh=1' : ''), true);
         request.timeout = 15000;
         request.onload = function () {
           var result = null;
@@ -195,7 +195,7 @@ var TV = (function () {
         request.send();
         return;
       }
-      luna('luna://io.freemytv.watchlist/get', {refresh: true}, done);
+      luna('luna://io.freemytv.watchlist/get', {refresh: true, force: !!force}, done);
     },
 
     launchPick: function (id, pick, done) {

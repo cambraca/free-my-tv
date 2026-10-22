@@ -22,9 +22,9 @@ fs.readFile(target, 'utf8', function (err, text) {
   waiting.splice(0).forEach(function (callback) { callback(); });
 });
 
-function refresh() {
-  if (running || Date.now() - attemptedAt < 10 * 60000) return;
-  if (snapshot && !snapshot.warnings.length && Watchlist.fresh(snapshot.updatedAt)) return;
+function refresh(force) {
+  if (running || (!force && Date.now() - attemptedAt < 10 * 60000)) return;
+  if (!force && snapshot && !snapshot.warnings.length && Watchlist.fresh(snapshot.updatedAt)) return;
   running = true;
   attemptedAt = Date.now();
   service.activityManager.create('watchlist-refresh', function (activity) {
@@ -41,13 +41,13 @@ function refresh() {
           finished();
         });
       });
-    });
+    }, force);
   });
 }
 
 service.register('get', function (message) {
   function respond() {
-    if (message.payload.refresh !== false) refresh();
+    if (message.payload.refresh !== false) refresh(message.payload.force === true);
     var client = snapshot ? {schema: snapshot.schema, source: snapshot.source, updatedAt: snapshot.updatedAt,
       entries: snapshot.entries.map(function (entry) { return entry.imdbId; }), picks: snapshot.picks,
       warnings: snapshot.warnings} : null;

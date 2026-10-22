@@ -7,6 +7,9 @@ var I18N = (function () {
 
   var lang = 'en';
   var german = {
+    "Refresh IMDb and Plex": "IMDb und Plex aktualisieren",
+    "Refreshing…": "Wird aktualisiert…",
+    "Watchlist updated.": "Merkliste aktualisiert.",
     "No titles available.": "Keine Titel verfügbar.",
     "Set your IMDb user ID in config.properties.": "Trage deine IMDb-Benutzer-ID in config.properties ein.",
     "Updating your watchlist…": "Deine Merkliste wird aktualisiert…",
@@ -78,6 +81,9 @@ var I18N = (function () {
   }
 
   var russian = {
+    "Refresh IMDb and Plex": "Обновить IMDb и Plex",
+    "Refreshing…": "Обновление…",
+    "Watchlist updated.": "Список обновлён.",
     "No titles available.": "Нет доступных фильмов и сериалов.",
     "Set your IMDb user ID in config.properties.": "Укажите ID пользователя IMDb в config.properties.",
     "Updating your watchlist…": "Обновление вашего списка…",

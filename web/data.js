@@ -196,7 +196,7 @@ var Data = (function () {
     return catalog(kind).slice(0, 3);
   }
 
-  function refreshRecs() {
+  function refreshRecs(force) {
     if (fetchingRecs || !CONFIG.imdbUserId || (!TV.isWebOS && !TV.isPreview)) return;
     if (pollTimer) { clearTimeout(pollTimer); pollTimer = 0; }
     fetchingRecs = true;
@@ -217,8 +217,8 @@ var Data = (function () {
       recsError = result.error || snapshot && snapshot.warnings.join(' ') || '';
       pollingRecs = result.refreshing;
       changed();
-      if (pollingRecs) pollTimer = setTimeout(function () { refreshRecs(); }, 5000);
-    });
+      if (pollingRecs) pollTimer = setTimeout(function () { refreshRecs(false); }, 5000);
+    }, force);
   }
 
   function all() {
@@ -239,6 +239,7 @@ var Data = (function () {
     onChange: function (fn) { listeners.push(fn); },
     setApps: function (apps) { installed = apps; catalogs = {}; },
     startSession: startSession,
+    refreshWatchlist: function () { refreshRecs(true); changed(); },
     appFor: appFor,
     refresh: function () { refreshWeather(); refreshRecs(); },
     settingsChanged: changed,

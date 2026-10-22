@@ -261,7 +261,7 @@
     return picks;
   }
 
-  function sync(config, previous, request, progress, done) {
+  function sync(config, previous, request, progress, done, force) {
     previous = valid(previous, config) ? previous : null;
     var warnings = [], entriesAt = 0;
     function match(entries) {
@@ -295,7 +295,7 @@
                 if (progress && (entriesDone % 25 === 0 || entriesDone === entries.length)) progress(snapshot());
                 setTimeout(pump, 0);
               }
-              if (cached && fresh(cached.checkedAt)) {
+              if (cached && fresh(cached.checkedAt) && !force) {
                 entry.resolved = cached.resolved;
                 entry.checkedAt = cached.checkedAt;
                 entriesDone++;
@@ -310,7 +310,7 @@
       });
     }
     if (!config.imdbUserId) { done(new Error('Set imdb_user_id in config.properties.')); return; }
-    if (previous && fresh(previous.entriesAt)) {
+    if (previous && fresh(previous.entriesAt) && !force) {
       entriesAt = previous.entriesAt;
       match(previous.entries.map(function (entry) {
         var copy = {};

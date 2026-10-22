@@ -48,9 +48,9 @@ function load() {
   } catch (error) {}
 }
 
-function refresh() {
-  if (!config.imdbUserId || refreshing || Date.now() - attemptedAt < 600000) return;
-  if (snapshot && Watchlist.fresh(snapshot.updatedAt) && !snapshot.warnings.length) return;
+function refresh(force) {
+  if (!config.imdbUserId || refreshing || (!force && Date.now() - attemptedAt < 600000)) return;
+  if (!force && snapshot && Watchlist.fresh(snapshot.updatedAt) && !snapshot.warnings.length) return;
   refreshing = true;
   attemptedAt = Date.now();
   const currentConfig = config, currentPath = snapshotPath;
@@ -67,7 +67,7 @@ function refresh() {
     fs.writeFileSync(temporary, JSON.stringify(result));
     fs.renameSync(temporary, currentPath);
     console.log('Watchlist: ' + result.entries.length + ' titles, ' + result.picks.length + ' available.');
-  });
+  }, force);
 }
 
 function send(response, status, type, body) {
@@ -87,7 +87,7 @@ const server = http.createServer((incoming, response) => {
     return;
   }
   if (pathname === '/api/watchlist') {
-    refresh();
+    refresh(new URL(incoming.url, 'http://localhost').searchParams.get('refresh') === '1');
     const client = snapshot ? {schema: snapshot.schema, source: snapshot.source, updatedAt: snapshot.updatedAt,
       entries: snapshot.entries.map(entry => entry.imdbId), picks: snapshot.picks, warnings: snapshot.warnings} : null;
     send(response, 200, 'application/json', JSON.stringify({returnValue: true, snapshot: client, refreshing, error: lastError}));
