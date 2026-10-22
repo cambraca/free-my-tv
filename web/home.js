@@ -899,6 +899,7 @@
   });
 
   function reopened() {
+    Data.startSession();
     reset();
     loadApps(function () { renderAll(); Data.refresh(); });
   }

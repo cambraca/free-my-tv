@@ -156,14 +156,38 @@ var Data = (function () {
   if (!Watchlist.valid(snapshot, CONFIG)) snapshot = null;
   if (Watchlist.valid(seed, CONFIG) && (!snapshot || seed.updatedAt > snapshot.updatedAt)) snapshot = seed;
   var fetchingRecs = false, pollingRecs = false, pollTimer = 0, recsError = '';
-  var sessionSeed = String(Math.floor(Date.now() / 3600000)), catalogs = {};
+  var sessionSeed = '', sessionAt = 0, catalogs = {}, previousFeatured = {}, featured = {};
+
+  function startSession() {
+    if (sessionAt && Date.now() - sessionAt < 1000) return;
+    sessionAt = Date.now();
+    sessionSeed = sessionAt + ':' + Math.random();
+    var previous = stored('featured');
+    previousFeatured = previous && previous.source === Watchlist.source(CONFIG) ? previous.tabs || {} : {};
+    featured = {};
+    for (var key in previousFeatured) if (previousFeatured.hasOwnProperty(key)) featured[key] = previousFeatured[key];
+    catalogs = {};
+  }
+
+  startSession();
 
   function catalog(kind) {
     var key = kind || 'explore';
-    if (!catalogs[key]) {
-      catalogs[key] = Watchlist.select(snapshot ? snapshot.picks : [], kind, function (service) {
-        return (CONFIG.watchlistServices || []).indexOf(service) >= 0 && !!appFor(service);
-      }, sessionSeed, null);
+    if (catalogs[key]) return catalogs[key];
+    var list = Watchlist.select(snapshot ? snapshot.picks : [], kind, function (service) {
+      return (CONFIG.watchlistServices || []).indexOf(service) >= 0 && !!appFor(service);
+    }, sessionSeed, null);
+    var previous = previousFeatured[key] || [], chosen = [], selected = {};
+    for (var index = 0; index < list.length && chosen.length < 3; index++) {
+      if (previous.indexOf(list[index].id) < 0) { chosen.push(list[index]); selected[list[index].id] = true; }
+    }
+    for (var remaining = 0; remaining < list.length && chosen.length < 3; remaining++) {
+      if (!selected[list[remaining].id]) { chosen.push(list[remaining]); selected[list[remaining].id] = true; }
+    }
+    catalogs[key] = chosen.concat(list.filter(function (pick) { return !selected[pick.id]; }));
+    if (chosen.length) {
+      featured[key] = chosen.map(function (pick) { return pick.id; });
+      store('featured', {source: Watchlist.source(CONFIG), tabs: featured});
     }
     return catalogs[key];
   }
@@ -214,6 +238,7 @@ var Data = (function () {
     city: Place.city,
     onChange: function (fn) { listeners.push(fn); },
     setApps: function (apps) { installed = apps; catalogs = {}; },
+    startSession: startSession,
     appFor: appFor,
     refresh: function () { refreshWeather(); refreshRecs(); },
     settingsChanged: changed,
