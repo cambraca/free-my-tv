@@ -182,6 +182,19 @@ var TV = (function () {
     isPreview: !!window.FMTV_PREVIEW,
 
     watchlist: function (done) {
+      if (!webos && window.FMTV_PREVIEW) {
+        var request = new XMLHttpRequest();
+        request.open('GET', '/api/watchlist', true);
+        request.timeout = 15000;
+        request.onload = function () {
+          var result = null;
+          try { if (request.status === 200) result = JSON.parse(request.responseText); } catch (error) {}
+          done(result);
+        };
+        request.onerror = request.ontimeout = function () { done(null); };
+        request.send();
+        return;
+      }
       luna('luna://io.freemytv.watchlist/get', {refresh: true}, done);
     },
 
