@@ -90,7 +90,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 #title {
   position: absolute;
-  left: 76px;
+  left: 184px;
   top: 52px;
   margin: 0;
   font-size: 76px;
@@ -102,6 +102,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   -webkit-transition: color 2s;
   transition: color 2s;
 }
+
+#brand-logo { position: absolute; left: 80px; top: 52px; width: 82px; height: 76px; object-fit: contain; }
 
 #tabs { position: absolute; left: 54px; top: 158px; height: 68px; white-space: nowrap; }
 .tab {
