@@ -267,8 +267,10 @@ Key files: `web/index.html`, `web/home.js`, `web/home.css`, `web/data.js`, `web/
 
 - The LG remote's blue button (keycode 406) starts the screensaver immediately while the app is open.
   **Settings → Start slideshow** provides the same action for remotes without a blue button.
-  Ignore held-blue-button repeats. Left/Right move to the previous/next slide, wrapping within the current shuffle
-  and restarting the 12-second timer. Only those two arrows keep the slideshow open; other keys or pointer
+  Ignore held-blue/OK-button repeats. Left/Right move to the previous/next slide, wrapping within the current shuffle
+  and restarting the 12-second timer. OK/Enter dismisses the slideshow and launches its current title through the
+  same service/title-link path as the cards, retaining Plex priority. Never activate the focused card underneath.
+  If there is no current title, OK simply dismisses it. Only Left/Right keep the slideshow open; other keys or pointer
   movement dismiss it without activating anything underneath. The blue shortcut preserves the current page/focus;
   the Settings action closes the menu. Cancel pending slide/fade timers when navigating or dismissing.
 - Use the full larger Explore grid as the slideshow pool. Shuffle a separate copy uniformly on every start

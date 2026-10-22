@@ -860,7 +860,7 @@
     setClass(body, 'night', Data.isNight(Date.now()));
   }
 
-  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, saverFadeTimer = 0, saverStep = null, SAVER_AFTER = 5 * 60000;
+  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, saverFadeTimer = 0, saverStep = null, saverPick = null, SAVER_AFTER = 5 * 60000;
 
   function showSaver() {
     if (saverOn) return;
@@ -871,6 +871,7 @@
       photos[target] = temporary;
     }
     saverIndex = -1;
+    saverPick = null;
     saverOn = true;
     var s = $('saver');
     s.innerHTML = '';
@@ -888,6 +889,7 @@
       clearTimeout(saverFadeTimer);
       if (photos.length) saverIndex = (saverIndex + (direction || 1) + photos.length) % photos.length;
       var p = photos.length ? photos[saverIndex] : null;
+      saverPick = p;
       var back = front === a ? b : a;
       if (p) {
         back.style.backgroundImage = 'url(' + Data.image(p.backdrop, 'w1280') + ')';
@@ -926,6 +928,7 @@
     clearTimeout(saverTimer);
     clearTimeout(saverFadeTimer);
     saverStep = null;
+    saverPick = null;
     setClass($('saver'), 'on', false);
   }
 
@@ -939,13 +942,21 @@
 
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
+    if (e.repeat && (k === TV.keys.slideshow || k === TV.keys.ok)) { e.preventDefault(); return; }
+    if (saverOn && k === TV.keys.ok) {
+      var pick = saverPick, app = pick && Data.appFor(pick.app);
+      idleAt = Date.now();
+      hideSaver();
+      if (app) launcher(app.id, app.title, pick)();
+      e.preventDefault();
+      return;
+    }
     if (saverOn && (k === TV.keys.left || k === TV.keys.right)) {
       idleAt = Date.now();
       if (saverStep) saverStep(k === TV.keys.left ? -1 : 1);
       e.preventDefault();
       return;
     }
-    if (e.repeat && k === TV.keys.slideshow) { e.preventDefault(); return; }
     if (poke()) { e.preventDefault(); return; }   // the first press only wakes the screen
     if (k === TV.keys.slideshow) showSaver();
     else if (k === TV.keys.left) move(-1, 0);
