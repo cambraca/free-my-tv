@@ -3,3 +3,9 @@
 The full guide is [CLAUDE.md](CLAUDE.md): read it first and follow it (it is written for any assistant, not only
 Claude Code). Most people ask in plain words, like "Install Free My TV on my TV at 192.168.1.50. I live in Lisbon.",
 and don't know what a terminal is: explain each step simply, and ask before anything that changes their TV or computer.
+
+Then read [FORK_CUSTOMIZATIONS.md](FORK_CUSTOMIZATIONS.md). It documents this fork's intentional differences and the
+checklist for merging from `origin`. Preserve those customizations unless the user explicitly asks to change them;
+where upstream-oriented instructions or descriptions in `CLAUDE.md` or `README.md` differ, follow the fork guide.
+Update the fork guide whenever a customization changes. Do not connect to or deploy to the user's TV, or push Git
+changes, unless explicitly requested.
