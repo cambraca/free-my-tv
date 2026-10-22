@@ -335,7 +335,7 @@
 
   // MARK: - Drawer
 
-  var BROWSE_COLUMNS = 5, BROWSE_ROWS = 2, BROWSE_STEP = 292;
+  var BROWSE_COLUMNS = 4, BROWSE_ROWS = 2, BROWSE_STEP = 326;
   var browsePicks = [], browseWindowStamp = '';
   var browsePositions = [{index: 0, first: 0}, {index: 0, first: 0}, {index: 0, first: 0}];
 
@@ -371,7 +371,7 @@
       for (var itemIndex = start; itemIndex < end; itemIndex++) {
         var item = browsePicks[itemIndex], card = el('div', 'browse-card', grid);
         card.setAttribute('data-index', itemIndex);
-        card.style.left = (20 + itemIndex % BROWSE_COLUMNS * 356) + 'px';
+        card.style.left = (20 + itemIndex % BROWSE_COLUMNS * 448) + 'px';
         card.style.top = (20 + Math.floor(itemIndex / BROWSE_COLUMNS) * BROWSE_STEP) + 'px';
         var image = el('div', 'img', card);
         image.style.backgroundImage = 'url(' + Data.image(item.backdrop, 'w780') + ')';

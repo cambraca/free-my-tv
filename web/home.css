@@ -373,11 +373,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #browse-title { position: absolute; left: 80px; top: 270px; margin: 0; font-size: 42px; font-weight: 600; }
 #browse-window { position: absolute; left: 60px; top: 340px; width: 1800px; height: 700px; overflow: hidden; pointer-events: auto; }
 #browse-grid { position: absolute; left: 0; top: 0; width: 1800px; -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); }
-.browse-card { position: absolute; width: 336px; height: 273px; }
-.browse-card .img { position: absolute; left: 0; top: 0; width: 336px; height: 190px; border-radius: 16px; overflow: hidden; background-color: #DADADF; background-size: cover; background-position: center; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16); -webkit-transition: -webkit-transform 0.25s; transition: transform 0.25s; }
+.browse-card { position: absolute; width: 416px; height: 301px; }
+.browse-card .img { position: absolute; left: 0; top: 0; width: 416px; height: 215px; border-radius: 16px; overflow: hidden; background-color: #DADADF; background-size: cover; background-position: center; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16); -webkit-transition: -webkit-transform 0.25s; transition: transform 0.25s; }
 .browse-card.focus .img { -webkit-transform: scale(1.04); transform: scale(1.04); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.26), 0 0 0 3px #FFF; }
-.browse-card .name { position: absolute; left: 0; right: 0; top: 204px; font-size: 26px; font-weight: 600; line-height: 35px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.browse-card .meta { position: absolute; left: 0; right: 0; top: 245px; font-size: 21px; line-height: 27px; color: #6E6E73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.browse-card .name { position: absolute; left: 0; right: 0; top: 230px; font-size: 28px; font-weight: 600; line-height: 35px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.browse-card .meta { position: absolute; left: 0; right: 0; top: 274px; font-size: 22px; line-height: 27px; color: #6E6E73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .browse-card .focus-note { padding: 16px 20px; font-size: 34px; -webkit-line-clamp: 3; }
 .night .browse-card .img { background-color: #2C2C2E; }
 .night .browse-card .meta { color: rgba(245, 245, 247, 0.62); }

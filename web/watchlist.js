@@ -43,6 +43,15 @@
     }));
   }
 
+  function duration(minutes) {
+    var hours = Math.floor(minutes / 60), remainder = minutes % 60;
+    return (hours ? hours + 'h ' : '') + remainder + 'm';
+  }
+
+  function formatMeta(value) {
+    return String(value || '').replace(/\b(\d+) min\b/g, function (match, minutes) { return duration(Number(minutes)); });
+  }
+
   function crawl(config, request, done) {
     function graphql(query, variables, callback) {
       request('POST', 'https://api.graphql.imdb.com/', {
@@ -230,7 +239,7 @@
         var result = {id: item.id, kind: kind, title: detail.title || detail.name || entry.title,
           backdrop: backdrop || detail.poster_path || '', services: services, links: {},
           meta: [entry.year, detail.genres && detail.genres[0] && detail.genres[0].name,
-            kind === 'movie' && detail.runtime ? detail.runtime + ' min' : ''].filter(Boolean).join(' · ')};
+            kind === 'movie' && detail.runtime ? duration(detail.runtime) : ''].filter(Boolean).join(' · ')};
         if (!services.length) { done(null, result); return; }
         request('GET', 'https://www.themoviedb.org/' + kind + '/' + item.id + '/watch?locale='
             + encodeURIComponent((config.tmdbRegion || 'US').toUpperCase()), {Accept: 'text/html'}, null,
@@ -262,7 +271,7 @@
       else backdrop = local && local.art ? plexURL(config, local.art) : entry.poster;
       picks.push({id: entry.imdbId, imdbId: entry.imdbId, kind: resolved ? resolved.kind : local.kind,
         title: resolved && resolved.title || local && local.title || entry.title, backdrop: backdrop,
-        meta: resolved && resolved.meta || String(entry.year || ''), note: entry.note || '',
+        meta: formatMeta(resolved && resolved.meta || String(entry.year || '')), note: entry.note || '',
         options: options, rank: entry.rank, addedAt: entry.addedAt});
     }
     return picks;
@@ -362,7 +371,7 @@
       result.app = item.option.app;
       result.service = item.option.service;
       result.url = item.option.url;
-      result.meta = [pick.meta, result.service].filter(Boolean).join(' · ');
+      result.meta = [formatMeta(pick.meta), result.service].filter(Boolean).join(' · ');
       return result;
     });
   }
