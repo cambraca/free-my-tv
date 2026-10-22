@@ -50,6 +50,11 @@
     }));
   }
 
+  function plexLinksReady(snapshot) {
+    var library = snapshot && snapshot.plex;
+    return !!(library && (library.linksVersion === 1 || !Object.keys(library.items || {}).length));
+  }
+
   function duration(minutes) {
     var hours = Math.floor(minutes / 60), remainder = minutes % 60;
     return (hours ? hours + 'h ' : '') + remainder + 'm';
@@ -125,7 +130,7 @@
 
   function scanPlex(config, request, done) {
     if (!config.plexHost || (config.watchlistServices || []).indexOf('plex') < 0) {
-      done(null, {items: {}, at: Date.now()}); return;
+      done(null, {items: {}, at: Date.now(), linksVersion: 1}); return;
     }
     function get(path, callback) {
       request('GET', plexBase(config) + path, config.plexToken
@@ -138,7 +143,7 @@
     }
     get('/', function (err, identity) {
       if (err) { done(err); return; }
-      var library = {items: {}, machine: identity.machineIdentifier, at: Date.now()};
+      var library = {items: {}, machine: identity.machineIdentifier, at: Date.now(), linksVersion: 1};
       if (!library.machine) { done(new Error('Plex server identity is missing.')); return; }
       get('/library/sections', function (sectionError, container) {
         if (sectionError) { done(sectionError); return; }
@@ -172,6 +177,7 @@
                 if (item.guid) guids.push({id: item.guid});
                 for (var guidIndex = 0; guidIndex < guids.length; guidIndex++) {
                   var guid = guids[guidIndex].id || '';
+                  if (/^plex:\/\/(?:movie|show)\/[a-f0-9]{24}$/i.test(guid)) match.guid = guid;
                   var imdb = /imdb:\/\/(tt\d+)/.exec(guid);
                   var tmdb = /(?:tmdb|themoviedb):\/\/(\d+)/.exec(guid);
                   if (imdb) library.items['imdb:' + imdb[1]] = match;
@@ -269,8 +275,7 @@
       var local = library.items['imdb:' + entry.imdbId]
           || (resolved && library.items[resolved.kind + ':' + resolved.id]);
       var options = [];
-      if (local) options.push({app: 'plex', service: 'Plex', url: 'plex://server/' + local.machine
-        + '/com.plexapp.plugins.library/library/metadata/' + encodeURIComponent(local.ratingKey)});
+      if (local) options.push({app: 'plex', service: 'Plex', url: local.guid || ''});
       for (var serviceIndex = 0; resolved && serviceIndex < resolved.services.length; serviceIndex++) {
         var service = resolved.services[serviceIndex];
         options.push({app: service, service: PROVIDERS[service], url: resolved.links[service] || ''});
@@ -291,7 +296,7 @@
     previous = valid(previous, config) ? previous : null;
     var warnings = [], entriesAt = 0, snapshotAt = previous ? previous.updatedAt : 0;
     function libraryData(callback) {
-      if (!force && previous && previous.plex && fresh(previous.plex.at)) { callback(null, previous.plex); return; }
+      if (!force && previous && plexLinksReady(previous) && fresh(previous.plex.at)) { callback(null, previous.plex); return; }
       scanPlex(config, request, callback);
     }
     function match(entries) {
@@ -424,7 +429,7 @@
     return list;
   }
 
-  return {source: source, valid: valid, fresh: fresh, notesReady: notesReady, clientSnapshot: clientSnapshot,
+  return {source: source, valid: valid, fresh: fresh, notesReady: notesReady, plexLinksReady: plexLinksReady, clientSnapshot: clientSnapshot,
     crawl: crawl, scanPlex: scanPlex, providerLinks: providerLinks,
     sync: sync, select: select, browse: browse};
 });

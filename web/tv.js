@@ -313,8 +313,12 @@ var TV = (function () {
       function fallback() { bridge.launch(id, null, function (ok) { if (done) done(ok, false); }); }
       if (webos && pick.app === 'netflix') {
         var match = /^https?:\/\/(?:www\.)?netflix\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?(?:title|watch)\/(\d+)(?:[/?#]|$)/i.exec(pick.url || '');
-        params = match ? {contentTarget: 'https://www.netflix.com/watch/' + match[1],
-          contentId: 'm=' + encodeURIComponent('http://api.netflix.com/catalog/titles/movies/' + match[1]) + '&source_type=4'} : null;
+        params = match ? {contentTarget: '-Q m='
+          + encodeURIComponent('http://api-global.netflix.com/catalog/titles/movies/' + match[1])} : null;
+      } else if (webos && pick.app === 'plex') {
+        params = /^plex:\/\/(?:movie|show)\/[a-f0-9]{24}$/i.test(pick.url || '') ? {contentTarget: pick.url} : null;
+      } else if (webos && pick.app === 'mubi') {
+        params = null;
       }
       if (!params) { fallback(); return; }
       this.launch(id, params, function (ok) {

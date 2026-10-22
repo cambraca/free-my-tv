@@ -255,14 +255,29 @@ card reuse, image request sizes, stable catalogues on status polls, and no cache
 - Keep `TV.launchPick` and pass the selected title through both featured-card and grid activation paths.
 - Resolve real Netflix/MUBI destinations from the title's TMDB watch page. Netflix needs its own numeric catalogue
   URL, never an IMDb or TMDB ID disguised as a Netflix ID.
-- On webOS, Netflix receives its real `contentTarget` URL plus
-  `contentId: 'm=' + encodeURIComponent('http://api.netflix.com/catalog/titles/movies/' + netflixId) + '&source_type=4'`,
-  following [LG Connect SDK's Netflix launch implementation](https://github.com/ConnectSDK/Connect-SDK-Android-Core/blob/master/src/com/connectsdk/service/WebOSTVService.java).
-  The old `m=https://www.netflix.com/watch/...` value was the wrong format. Validate the numeric Netflix ID before
-  constructing parameters; never use IMDb/TMDB IDs as a substitute. This works with existing cached Netflix URLs.
-- Plex still attempts the matched library item's `plex://server/...` destination, and MUBI uses its actual title
-  URL, through `contentTarget`. Their installed webOS apps may ignore these targets; incoming Plex library-title
-  deep linking has not been verified. Do not invent extra Plex parameters or claim a universal working format.
+- Netflix's webOS `params.contentTarget` is `'-Q m=' +
+  encodeURIComponent('http://api-global.netflix.com/catalog/titles/movies/' + netflixId)`. This matches the actual
+  LG target returned by JustWatch's public GraphQL endpoint, checked on 2026-10-22 for *A.I. Artificial Intelligence*
+  in EC. Validate the numeric provider ID; existing cached Netflix watch/title URLs need no recrawl.
+  Do not mix a web URL target with Connect SDK's legacy `contentId`: that example uses a different API envelope,
+  `ssap://system.launcher/launch`, and the previous mixed Luna parameters stalled Netflix at loading.
+- Plex's current [official webOS app](https://app.plex.tv/tv-v5-webos/) reads `params.contentTarget` as a Plex
+  metadata GUID (`plex://movie/<24-hex-id>` or `plex://show/<24-hex-id>`). Retain that GUID from the library scan
+  alongside the IMDb/TMDB matching GUIDs. Its handler interprets `plex://server/...` as a metadata GUID too, so
+  the previous invented server URL could never identify the requested title. Plex resolves the GUID using its
+  signed-in account and connected servers; the TV app must have access to the matched server.
+- `plex.linksVersion: 1` marks a scan that captured native GUIDs. Automatically rescan older nonempty libraries
+  even within the usual freshness window, retaining their complete cached data if the server is unavailable.
+  Preserve IMDb/metadata caches during this migration. A successful scan without native GUIDs (older agents)
+  remains valid and opens Plex with a title-search fallback; do not repeatedly rescan it for missing GUIDs.
+- MUBI publishes an empty LG `contentTarget`, checked for *Bouchra* and *Belle* through JustWatch on 2026-10-22.
+  Its website URLs opened only the app on this TV. Open MUBI normally and report the title-search fallback;
+  do not report a website URL as successful native title navigation or invent numeric targets. Keep its web
+  URLs in the metadata for other platforms and future support.
+- To recheck provider targets without contacting the TV, POST a GraphQL query to
+  `https://apis.justwatch.com/graphql`, for example
+  `{urlV2(fullPath:"/eg/movie/bouchra"){node{... on Movie{offers(country:EG,platform:WEB){deeplinkURL(platform:WEBOS) standardWebURL package{clearName}}}}}}`.
+  This is research evidence, not an additional runtime dependency or availability source.
 - When no exact URL is available, open the app normally and show the title-search toast instead of launching an
   invalid target. Also retry a normal app launch if webOS rejects a targeted launch, reporting the search fallback.
   A successful Luna launch only acknowledges the launch request, not navigation to the requested title.
