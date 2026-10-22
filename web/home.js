@@ -865,6 +865,12 @@
   function showSaver() {
     if (saverOn) return;
     var photos = Data.showcase().filter(function (p) { return p.backdrop && Data.appFor(p.app); });
+    for (var index = photos.length - 1; index > 0; index--) {
+      var target = Math.floor(Math.random() * (index + 1)), temporary = photos[index];
+      photos[index] = photos[target];
+      photos[target] = temporary;
+    }
+    saverIndex = 0;
     saverOn = true;
     var s = $('saver');
     s.innerHTML = '';
