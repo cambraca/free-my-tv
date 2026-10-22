@@ -271,7 +271,12 @@
       img.style.backgroundImage = 'url(' + Data.image(p.backdrop, c === 0 ? 'w1280' : 'w780') + ')';
       if (p.note) el('div', 'focus-note', img, p.note);
       el('div', 'name', card, p.title);
-      if (p.meta) el('div', 'meta', card, p.meta);
+      if (p.meta) {
+        var meta = c === 0 ? p.meta : p.meta.split(' · ').filter(function (part) {
+          return /^\d/.test(part) || part === p.service;
+        }).join(' · ');
+        el('div', 'meta', card, meta);
+      }
       hover(card, Z.CARDS, c);
     }
     st.card = Math.min(st.card, Math.max(0, list.length - 1));

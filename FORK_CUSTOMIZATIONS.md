@@ -204,8 +204,8 @@ These two selection policies are deliberately different. Do not share one orderi
 
 - The top/featured page contains the title, four tabs, three featured titles, and app shelf. A compact weather
   widget sits immediately left of Settings at the top-right.
-- All three featured cards show year, genre, runtime/show count, and service metadata. The two narrower cards
-  allow up to two lines so details remain readable without overlapping the app shelf.
+- All three featured cards show metadata. The large card includes genre; the two narrower cards omit genres,
+  showing only year, runtime/show count, and service on a single line.
 - Down from the shelf opens the selected tab's larger watchlist grid. The app shelf stays pinned above it.
   The bottom page has **four columns**, no duplicate page title, and no weather widget.
 - Do not reintroduce the removed “More titles”, “Back to featured”, or `33–40 / 143` status/footer bar. Its space
