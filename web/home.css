@@ -1,7 +1,7 @@
 /*
  * The home screen on a 1920 × 1080 stage, with the Android app's measurements (HomeView): the title and tabs at the top
  * left, icon-only glass buttons at the top right, three picks, and the glass shelf at the bottom; ↓ on the shelf opens
- * the drawer (inputs, shortcuts, weather, prices). Light by day, dark from sunset to sunrise.
+ * the scrollable watchlist with compact weather. Light by day, dark from sunset to sunrise.
  * No CSS variables, grid or backdrop-filter: older LG TVs (webOS 3 and 4) don't have them, and blur is too heavy for
  * their GPUs. Only transform and opacity animate.
  */
@@ -80,11 +80,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   -webkit-transition: -webkit-transform 0.55s cubic-bezier(0.32, 0.72, 0.2, 1), opacity 0.4s;
   transition: transform 0.55s cubic-bezier(0.32, 0.72, 0.2, 1), opacity 0.4s;
 }
-.drawer-open #home { -webkit-transform: translateY(-560px); transform: translateY(-560px); }
+.drawer-open #home { -webkit-transform: translateY(-800px); transform: translateY(-800px); }
 #top { -webkit-transition: opacity 0.3s; transition: opacity 0.3s; }
-.drawer-open #top { opacity: 0; }
-#drawer { -webkit-transform: translateY(560px); transform: translateY(560px); opacity: 0; }
-.drawer-open #drawer { -webkit-transform: none; transform: none; opacity: 1; }
+.drawer-open #top { opacity: 0; pointer-events: none; }
+#drawer { -webkit-transform: translateY(560px); transform: translateY(560px); opacity: 0; visibility: hidden; pointer-events: none; }
+.drawer-open #drawer { -webkit-transform: none; transform: none; opacity: 1; visibility: visible; }
 
 /* MARK: - Title and tabs */
 
@@ -349,10 +349,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night .tile { box-shadow: 0 4px 22px rgba(0, 0, 0, 0.3); }
 .night .tile.focus { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6); }
 
-/* MARK: - Drawer: inputs and shortcuts, weather, prices */
-
-.row-title { position: absolute; top: 494px; font-size: 25px; font-weight: 600; color: #6E6E73; white-space: nowrap; }
-.night .row-title { color: rgba(255, 255, 255, 0.7); }
+/* MARK: - Scrollable watchlist and compact weather */
 
 .glass {
   background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.66));
@@ -365,47 +362,26 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 1.5px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
 }
 
-.key {
-  position: absolute;
-  top: 540px;
-  height: 126px;
-  border-radius: 20px;
-  text-align: center;
-  color: #1D1D1F;
-  -webkit-transition: -webkit-transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.28s, background-color 0.2s;
-  transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.28s, background-color 0.2s;
-}
-.key .sym { position: absolute; left: 50%; top: 33px; width: 34px; height: 34px; margin-left: -17px; }
-.key .label { position: absolute; left: 8px; right: 8px; top: 82px; font-size: 23px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.key.off { color: #8E8E93; }
-.key.focus { background: #F5F5F7; color: #1C1C1E; -webkit-transform: scale(1.07); transform: scale(1.07); box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42); z-index: 2; }
-.night .key { color: rgba(255, 255, 255, 0.95); }
-.night .key.off { color: rgba(255, 255, 255, 0.42); }
-.night .key.focus { color: #1C1C1E; }
-
-.panel { position: absolute; top: 708px; height: 300px; border-radius: 30px; overflow: hidden; color: #1D1D1F; }
-.night .panel { color: #F5F5F7; }
-.panel .head { position: absolute; left: 34px; top: 30px; font-size: 25px; font-weight: 600; color: #6E6E73; white-space: nowrap; }
-.panel .side { position: absolute; right: 34px; top: 33px; font-size: 21px; font-weight: 500; color: #8E8E93; white-space: nowrap; }
-.night .panel .head { color: rgba(255, 255, 255, 0.7); }
-.night .panel .side { color: rgba(255, 255, 255, 0.6); }
-
-#weather .now { position: absolute; left: 34px; top: 82px; height: 100px; white-space: nowrap; }
-#weather .now .sym { width: 56px; height: 56px; vertical-align: 12px; margin-right: 18px; }
-#weather .now .temp { font-size: 100px; font-weight: 300; line-height: 100px; font-feature-settings: 'tnum'; }
-#weather .cond { position: absolute; left: 34px; top: 192px; font-size: 29px; font-weight: 500; white-space: nowrap; }
-#weather .range { position: absolute; left: 34px; top: 236px; font-size: 23px; font-weight: 500; color: #6E6E73; white-space: nowrap; font-feature-settings: 'tnum'; }
-#weather .split { position: absolute; left: 391px; top: 34px; bottom: 34px; width: 2px; background: rgba(0, 0, 0, 0.1); }
-#weather .hours { position: absolute; left: 422px; right: 30px; top: 74px; height: 140px; }
-#weather .hour { position: absolute; top: 0; text-align: center; font-feature-settings: 'tnum'; }
-#weather .hour .t { font-size: 22px; font-weight: 500; color: #6E6E73; }
-#weather .hour .sym { display: block; width: 30px; height: 30px; margin: 22px auto 18px; }
-#weather .hour .d { font-size: 26px; font-weight: 500; }
-#weather .sun { position: absolute; left: 422px; top: 236px; font-size: 23px; font-weight: 500; color: #6E6E73; white-space: nowrap; }
-#weather .sun .sym { width: 22px; height: 22px; vertical-align: -3px; margin-right: 10px; }
-#weather .sun span { margin-right: 36px; }
-.night #weather .range, .night #weather .hour .t, .night #weather .sun { color: rgba(255, 255, 255, 0.68); }
-.night #weather .split { background: rgba(255, 255, 255, 0.14); }
+#browse-title { position: absolute; left: 80px; top: 270px; margin: 0; font-size: 42px; font-weight: 600; }
+#browse-window { position: absolute; left: 60px; top: 340px; width: 1800px; height: 700px; overflow: hidden; pointer-events: auto; }
+#browse-grid { position: absolute; left: 0; top: 0; width: 1800px; -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); }
+.browse-card { position: absolute; width: 336px; height: 273px; }
+.browse-card .img { position: absolute; left: 0; top: 0; width: 336px; height: 190px; border-radius: 16px; overflow: hidden; background-color: #DADADF; background-size: cover; background-position: center; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16); -webkit-transition: -webkit-transform 0.25s; transition: transform 0.25s; }
+.browse-card.focus .img { -webkit-transform: scale(1.04); transform: scale(1.04); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.26), 0 0 0 3px #FFF; }
+.browse-card .name { position: absolute; left: 0; right: 0; top: 204px; font-size: 26px; font-weight: 600; line-height: 35px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.browse-card .meta { position: absolute; left: 0; right: 0; top: 245px; font-size: 21px; line-height: 27px; color: #6E6E73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.night .browse-card .img { background-color: #2C2C2E; }
+.night .browse-card .meta { color: rgba(245, 245, 247, 0.62); }
+#browse-empty { position: absolute; left: 20px; top: 140px; right: 20px; text-align: center; font-size: 28px; color: #6E6E73; }
+.night #browse-empty { color: rgba(245, 245, 247, 0.62); }
+#browse-weather { position: absolute; right: 80px; top: 250px; width: 490px; height: 84px; border-radius: 24px; }
+#browse-weather .place { position: absolute; left: 22px; top: 13px; max-width: 230px; font-size: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#browse-weather .condition { position: absolute; left: 22px; top: 46px; max-width: 300px; font-size: 20px; color: #6E6E73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#browse-weather .current { position: absolute; right: 20px; top: 11px; height: 40px; white-space: nowrap; }
+#browse-weather .sym { width: 28px; height: 28px; vertical-align: 0; margin-right: 10px; }
+#browse-weather .temp { font-size: 37px; font-weight: 400; line-height: 42px; }
+#browse-weather .range { position: absolute; right: 22px; top: 54px; font-size: 18px; color: #6E6E73; }
+.night #browse-weather .condition, .night #browse-weather .range { color: rgba(245, 245, 247, 0.62); }
 
 /*
 #prices .coin { position: absolute; left: 34px; right: 34px; height: 40px; font-size: 29px; font-weight: 500; white-space: nowrap; }

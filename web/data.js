@@ -38,6 +38,7 @@ var Prefs = (function () {
     temperature: function () { return pick('temperature', CONFIG.temperature || 'auto'); },
     theme: function () { return pick('theme', 'auto'); },
     weather: function () { return pick('weather', true); },
+    tab: function () { return Math.max(0, Math.min(2, Math.floor(Number(pick('tab', 0)) || 0))); },
     shelf: function () { return pick('shelf', null); },
     set: function (name, value) { v[name] = value; save(); this.version++; }
   };

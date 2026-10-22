@@ -1,9 +1,8 @@
 /*
  * The home screen for web-app TVs (LG webOS, Samsung Tizen), with the Android app's design and behavior (HomeView):
- *  - top: the "For You" title and the tabs (Explore, Movies, Shows); icon-only glass buttons at the right (Live TV,
- *    HDMI Inputs, Settings) and the crypto quotes at the end of the tab row;
- *  - three picks for this hour in the selected tab; the background is the first one's photo, blurred and almost white;
- *  - the glass shelf with the apps; ↓ opens the drawer (inputs, shortcuts, weather, prices); ↑ or Back closes it;
+ *  - top: the title, Explore/Movies/Shows tabs and Settings;
+ *  - three weighted watchlist picks per launch; the background is the first one's photo, blurred and almost white;
+ *  - the glass shelf with the apps; ↓ opens the selected tab's scrollable watchlist and compact weather;
  *  - a night look from sunset to sunrise; a screensaver after a few idle minutes.
  * The remote's arrows, OK and Back move the focus; a pointer (LG's Magic Remote) focuses what it points at.
  */
@@ -146,7 +145,7 @@
   // MARK: - Focus
 
   var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit'};
-  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0};
+  var st = {zone: Z.SHELF, top: 0, tab: Prefs.tab(), card: 0, shelf: 0, drawer: 0, first: 0, browsing: false, grid: 0, row: 0, edit: 0};
   var cards = [];
 
   function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT; }
@@ -165,15 +164,21 @@
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.CARDS && st.card === i);
     list = $('tiles').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.SHELF && st.shelf === i);
-    list = document.querySelectorAll('#drawer .key');
-    for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.DRAWER && st.drawer === i);
+    if (st.browsing) {
+      var browseRow = Math.floor(st.drawer / BROWSE_COLUMNS), totalRows = Math.ceil(browsePicks.length / BROWSE_COLUMNS);
+      if (browseRow < st.first) st.first = browseRow;
+      if (browseRow >= st.first + BROWSE_ROWS) st.first = browseRow - BROWSE_ROWS + 1;
+      st.first = Math.max(0, Math.min(Math.max(0, totalRows - BROWSE_ROWS), st.first));
+      browsePositions[st.tab] = {index: st.drawer, first: st.first};
+      renderBrowseWindow();
+    }
     list = document.querySelectorAll('#apps .cell');
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.APPS && st.grid === i);
     var rows = Math.max(1, Math.ceil(others.length / 5)), r = Math.floor(st.grid / 5), first = Math.max(0, Math.min(rows - 3, r - 1));
     $('apps').lastChild.style.webkitTransform = $('apps').lastChild.style.transform = 'translateY(' + (-first * 239) + 'px)';
     focusRows($('settings'), st.row, st.zone === Z.SETTINGS);
     focusRows($('shelfedit'), st.edit, st.zone === Z.EDIT);
-    setClass(body, 'drawer-open', st.zone === Z.DRAWER);
+    setClass(body, 'drawer-open', st.browsing);
   }
 
   function focusRows(sheet, index, on) {
@@ -329,76 +334,77 @@
 
   // MARK: - Drawer
 
-  var drawerItems = [], drawerInputs = 0;
+  var BROWSE_COLUMNS = 5, BROWSE_ROWS = 2, BROWSE_STEP = 292;
+  var browsePicks = [], browseWindowStamp = '';
+  var browsePositions = [{index: 0, first: 0}, {index: 0, first: 0}, {index: 0, first: 0}];
 
   function renderDrawer() {
-    var d = $('drawer');
-    d.innerHTML = '';
-    drawerItems = [];
-    drawerInputs = drawerItems.length;
-    drawerItems.push({label: tr('Todos os Apps', 'All Apps', 'Todas las apps'), symbol: 'apps', run: openApps});
-    drawerItems.push({label: tr('Ajustes do Início', 'Home Settings', 'Ajustes de inicio'), symbol: 'settings', run: openSettings});
-    drawerItems.push({label: tr('Ajustes da TV', 'TV Settings', 'Ajustes del TV'), symbol: 'tv_settings', run: tvSettings});
-    var n = drawerItems.length, gap = 18, groupGap = 56, groups = drawerInputs > 0 && drawerInputs < n ? 2 : 1;
-    var tw = Math.min(230, (1760 - Math.max(0, n - groups) * gap - (groups - 1) * groupGap) / Math.max(1, n));
-    var xPos = 80;
-    for (var k = 0; k < n; k++) {
-      if (k === drawerInputs && k > 0) {
-        xPos += groupGap - gap;
-        el('div', 'row-title', d, tr('Atalhos', 'Shortcuts', 'Accesos directos')).style.left = (xPos + 4) + 'px';
+    $('browse-title').textContent = [tr('Explorar', 'Explore', 'Explorar'), tr('Filmes', 'Movies', 'Películas'), tr('Séries', 'Shows', 'Series')][st.tab];
+    var focused = browsePicks[st.drawer], list = Data.catalog(TAB_KIND[st.tab]);
+    if (focused && st.browsing) {
+      for (var index = 0; index < list.length; index++) {
+        if (list[index].id === focused.id) { st.drawer = index; break; }
       }
-      if (k === 0 && drawerInputs) el('div', 'row-title', d, tr('Entradas', 'Inputs', 'Entradas')).style.left = '84px';
-      var item = drawerItems[k], key = el('div', 'key glass' + (item.off ? ' off' : ''), d);
-      key.style.left = xPos + 'px';
-      key.style.width = tw + 'px';
-      sym(item.symbol, key);
-      el('div', 'label', key, item.label);
-      hover(key, Z.DRAWER, k);
-      xPos += tw + gap;
     }
+    browsePicks = list;
+    st.drawer = Math.max(0, Math.min(st.drawer, list.length - 1));
+    $('browse-empty').textContent = list.length ? '' : $('watchlist-status').textContent
+        || tr('Nenhum título disponível.', 'No titles available.', 'No hay títulos disponibles.');
     renderPanels();
     updateFocus();
   }
 
-  function renderPanels() {
-    var d = $('drawer');
-    var old = d.querySelectorAll('.panel');
-    for (var o = 0; o < old.length; o++) d.removeChild(old[o]);
-    if (Prefs.weather()) {
-      var w = el('div', 'panel glass', d);
-      w.id = 'weather';
-      w.style.left = '80px';
-      w.style.width = '1760px';
-      renderWeather(w);
+  function renderBrowseWindow() {
+    var firstRow = Math.max(0, st.first - 1);
+    var lastRow = Math.min(Math.ceil(browsePicks.length / BROWSE_COLUMNS), st.first + BROWSE_ROWS + 1);
+    var start = firstRow * BROWSE_COLUMNS, end = Math.min(browsePicks.length, lastRow * BROWSE_COLUMNS);
+    var stamp = st.tab + ':' + start + ':' + end;
+    for (var index = start; index < end; index++) {
+      var pick = browsePicks[index];
+      stamp += JSON.stringify([pick.id, pick.title, pick.meta, pick.backdrop, pick.app, pick.url]);
+    }
+    var grid = $('browse-grid');
+    if (stamp !== browseWindowStamp) {
+      browseWindowStamp = stamp;
+      grid.innerHTML = '';
+      for (var itemIndex = start; itemIndex < end; itemIndex++) {
+        var item = browsePicks[itemIndex], card = el('div', 'browse-card', grid);
+        card.setAttribute('data-index', itemIndex);
+        card.style.left = (20 + itemIndex % BROWSE_COLUMNS * 356) + 'px';
+        card.style.top = (20 + Math.floor(itemIndex / BROWSE_COLUMNS) * BROWSE_STEP) + 'px';
+        var image = el('div', 'img', card);
+        image.style.backgroundImage = 'url(' + Data.image(item.backdrop, 'w780') + ')';
+        el('div', 'name', card, item.title);
+        el('div', 'meta', card, item.meta);
+        hover(card, Z.DRAWER, itemIndex);
+      }
+    }
+    grid.style.webkitTransform = grid.style.transform = 'translateY(' + (-st.first * BROWSE_STEP) + 'px)';
+    var nodes = grid.children;
+    for (var nodeIndex = 0; nodeIndex < nodes.length; nodeIndex++) {
+      var pickIndex = Number(nodes[nodeIndex].getAttribute('data-index'));
+      setClass(nodes[nodeIndex], 'focus', st.zone === Z.DRAWER && pickIndex === st.drawer);
+      var row = Math.floor(pickIndex / BROWSE_COLUMNS);
+      nodes[nodeIndex].style.pointerEvents = row >= st.first && row < st.first + BROWSE_ROWS ? 'auto' : 'none';
     }
   }
 
-  function renderWeather(card) {
-    el('div', 'head', card, Data.city || tr('Clima', 'Weather', 'Clima'));
-    var w = Data.weather;
-    if (!w) {
-      el('div', 'cond', card, tr('Sem dados do clima agora.', 'No weather data right now.', 'No hay datos del clima ahora.')).style.top = '96px';
+  function renderPanels() {
+    var card = $('browse-weather');
+    card.innerHTML = '';
+    card.style.display = Prefs.weather() ? '' : 'none';
+    if (!Prefs.weather()) return;
+    el('div', 'place', card, Data.city || tr('Clima', 'Weather', 'Clima'));
+    var weather = Data.weather;
+    if (!weather) {
+      el('div', 'condition', card, tr('Sem dados do clima agora.', 'No weather data right now.', 'No hay datos del clima ahora.'));
       return;
     }
-    var now = el('div', 'now', card);
-    sym(Data.symbol(w.code, w.isDay), now);
-    el('span', 'temp', now, Data.degrees(w.temp));
-    el('div', 'cond', card, Data.condition(w.code, w.isDay));
-    el('div', 'range', card, I18N.lang === 'ru' ? 'Макс. ' + Data.degrees(w.max) + '   Мин. ' + Data.degrees(w.min) : tr('Máx. ' + Data.degrees(w.max) + '   Mín. ' + Data.degrees(w.min), 'H:' + Data.degrees(w.max) + '   L:' + Data.degrees(w.min),
-        'Máx. ' + Data.degrees(w.max) + '   Mín. ' + Data.degrees(w.min)));
-    el('div', 'split', card);
-    var hours = el('div', 'hours', card), width = parseFloat(card.style.width) - 30 - 422, hw = width / 6;
-    for (var i = 0; i < w.hours.length && i < 6; i++) {
-      var h = el('div', 'hour', hours), x = w.hours[i];
-      h.style.left = (hw * i) + 'px';
-      h.style.width = hw + 'px';
-      el('div', 't', h, Data.hour(x.at));
-      sym(Data.symbol(x.code, x.day), h);
-      el('div', 'd', h, Data.degrees(x.temp));
-    }
-    var sun = el('div', 'sun', card);
-    if (w.sunrise) { var a = el('span', '', sun); sym('sunrise', a); a.appendChild(document.createTextNode(tr('Nascer ', 'Sunrise ', 'Amanecer ') + Data.time(w.sunrise))); }
-    if (w.sunset) { var b = el('span', '', sun); sym('sunset', b); b.appendChild(document.createTextNode(tr('Pôr do sol ', 'Sunset ', 'Atardecer ') + Data.time(w.sunset))); }
+    var current = el('div', 'current', card);
+    sym(Data.symbol(weather.code, weather.isDay), current);
+    el('span', 'temp', current, Data.degrees(weather.temp));
+    el('div', 'condition', card, Data.condition(weather.code, weather.isDay));
+    el('div', 'range', card, Data.degrees(weather.max) + ' / ' + Data.degrees(weather.min));
   }
 
   // function renderPrices(card, coins) {
@@ -417,17 +423,14 @@
   // }
 
   function openDrawer() {
-    if (!drawerItems.length) return;
-    var tiles = $('tiles').children;
-    st.zone = Z.DRAWER;
-    st.drawer = Math.min(drawerItems.length - 1, nearest(document.querySelectorAll('#drawer .key'), centerX(tiles[st.shelf])));
-    updateFocus();
+    st.browsing = true;
+    st.zone = browsePicks.length ? Z.DRAWER : Z.SHELF;
+    renderDrawer();
   }
 
   function closeDrawer() {
-    var keys = document.querySelectorAll('#drawer .key');
+    st.browsing = false;
     st.zone = Z.SHELF;
-    if (shelf.length) st.shelf = nearest($('tiles').children, centerX(keys[st.drawer]));
     updateFocus();
   }
 
@@ -481,6 +484,7 @@
       // {label: tr('Widget de cotações', 'Quotes widget', 'Widget de cotizaciones'), toggle: Prefs.quotes(),
       //   step: function () { Prefs.set('quotes', !Prefs.quotes()); Data.settingsChanged(); }}
     ];
+    rows.push({label: tr('Todos os Apps', 'All Apps', 'Todas las apps'), value: '›', step: function (d) { if (d >= 0) openApps(); }});
     rows.push({label: tr('Prateleira', 'Shelf', 'Estante'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('Ajustes da TV', 'TV Settings', 'Ajustes del TV'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
     return rows;
@@ -630,7 +634,8 @@
         if (shelf[st.shelf]) launcher(shelf[st.shelf].id, shelf[st.shelf].title)();
         return;
       case Z.DRAWER:
-        if (drawerItems[st.drawer]) drawerItems[st.drawer].run();
+        var item = browsePicks[st.drawer], service = item && Data.appFor(item.app);
+        if (service) launcher(service.id, service.title, item)();
         return;
       case Z.APPS:
         if (others[st.grid]) launcher(others[st.grid].id, others[st.grid].title)();
@@ -646,8 +651,14 @@
 
   function selectTab(i) {
     if (i === st.tab) return;
+    browsePositions[st.tab] = {index: st.drawer, first: st.first};
     st.tab = i;
+    Prefs.set('tab', i);
+    st.drawer = browsePositions[i].index;
+    st.first = browsePositions[i].first;
+    renderWatchlistStatus();
     renderCards();
+    renderDrawer();
   }
 
   function move(dx, dy) {
@@ -657,6 +668,7 @@
         if (dx) st.shelf = Math.max(0, Math.min(shelf.length - 1, st.shelf + dx));
         else if (dy > 0) { openDrawer(); return; }
         else if (dy < 0) {
+          if (st.browsing) st.browsing = false;
           if (cards.length) { st.zone = Z.CARDS; st.card = nearest(cardNodes, centerX(tiles[st.shelf])); }
           else { st.zone = Z.TOP; st.top = st.tab; }
         }
@@ -676,8 +688,13 @@
         }
         break;
       case Z.DRAWER:
-        if (dx) st.drawer = Math.max(0, Math.min(drawerItems.length - 1, st.drawer + dx));
-        else if (dy < 0) { closeDrawer(); return; }
+        var target = st.drawer + dx + dy * BROWSE_COLUMNS;
+        if (dy < 0 && st.drawer < BROWSE_COLUMNS) { st.zone = Z.SHELF; }
+        else if (dy > 0 && Math.floor(target / BROWSE_COLUMNS) < Math.ceil(browsePicks.length / BROWSE_COLUMNS)) {
+          st.drawer = Math.min(browsePicks.length - 1, target);
+        } else if (dx && target >= 0 && target < browsePicks.length
+            && Math.floor(target / BROWSE_COLUMNS) === Math.floor(st.drawer / BROWSE_COLUMNS)) st.drawer = target;
+        else if (dy < 0 && target >= 0) st.drawer = target;
         break;
       case Z.APPS:
         var g = st.grid + dx + dy * 5;
@@ -701,7 +718,7 @@
   function back() {
     if (st.zone === Z.EDIT) { setClass($('shelfedit'), 'open', false); openSettings(); st.row = rowsNow.length - 2; updateFocus(); return; }
     if (sheetOpen()) { closeSheets(); return; }
-    if (st.zone === Z.DRAWER) { closeDrawer(); return; }
+    if (st.browsing) { closeDrawer(); return; }
     if (st.zone !== Z.SHELF && shelf.length) { st.zone = Z.SHELF; updateFocus(); return; }
     TV.back();
   }
@@ -710,9 +727,8 @@
   function hover(node, zone, index) {
     node.onmouseover = function () {
       if (saverOn || (sheetOpen() !== (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT))) return;
-      if (zone === Z.DRAWER && st.zone !== Z.DRAWER) return;
-      if (zone !== Z.DRAWER && st.zone === Z.DRAWER && zone !== Z.SHELF) return;
-      if (zone === Z.SHELF && st.zone === Z.DRAWER) closeDrawer();
+      if (zone === Z.DRAWER && !st.browsing) return;
+      if (zone !== Z.DRAWER && st.browsing && zone !== Z.SHELF) return;
       st.zone = zone;
       if (zone === Z.TOP) { st.top = index; if (index < 3) selectTab(index); }
       else if (zone === Z.CARDS) st.card = index;
@@ -810,12 +826,29 @@
     else if (k === TV.keys.right) move(1, 0);
     else if (k === TV.keys.up) move(0, -1);
     else if (k === TV.keys.down) move(0, 1);
+    else if ((k === 33 || k === 34) && st.browsing) {
+      st.zone = Z.DRAWER;
+      st.drawer = Math.max(0, Math.min(browsePicks.length - 1, st.drawer + (k === 34 ? 1 : -1) * BROWSE_COLUMNS * BROWSE_ROWS));
+      updateFocus();
+    }
     else if (k === TV.keys.ok) activate();
     else if (k === TV.keys.back || k === 27 || k === 8) back();
     else return;
     e.preventDefault();
   });
   document.addEventListener('mousemove', function () { poke(); });
+  var wheelAt = 0;
+  document.addEventListener('wheel', function (event) {
+    if (sheetOpen() || !event.deltaY) return;
+    event.preventDefault();
+    if (poke() || Date.now() - wheelAt < 160) return;
+    wheelAt = Date.now();
+    if (!st.browsing && event.deltaY > 0) { openDrawer(); return; }
+    if (!st.browsing) return;
+    if (st.zone === Z.SHELF && event.deltaY < 0) { closeDrawer(); return; }
+    st.zone = Z.DRAWER;
+    move(0, event.deltaY > 0 ? 1 : -1);
+  }, {passive: false});
 
   // MARK: - Start
 
@@ -847,27 +880,39 @@
     hideSaver();
     closeSheets();
     st.zone = Z.SHELF;
+    st.browsing = false;
     st.shelf = 0;
-    if (st.tab !== 0) { st.tab = 0; renderCards(); }
+    st.drawer = 0;
+    st.first = 0;
+    browsePicks = [];
+    browseWindowStamp = '';
+    browsePositions = [{index: 0, first: 0}, {index: 0, first: 0}, {index: 0, first: 0}];
     updateFocus();
   }
 
   Data.onChange(function () {
     renderWatchlistStatus();
     renderCards();
-    renderPanels();
+    renderDrawer();
+    if (st.zone === Z.SETTINGS) renderSettings();
     checkNight();
   });
 
-  function reopened() { reset(); loadApps(function () { renderShelf(); renderDrawer(); Data.refresh(); }); }
+  function reopened() {
+    reset();
+    loadApps(function () { renderAll(); Data.refresh(); });
+  }
 
   window.addEventListener('resize', fit);
   document.addEventListener('webOSRelaunch', reopened);   // LG: opened again while running
   window.addEventListener('appcontrol', reopened);        // Samsung: the same
+  var wasHidden = document.hidden;
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { hideSaver(); return; }
+    if (document.hidden) { wasHidden = true; hideSaver(); return; }
+    if (!wasHidden) return;
+    wasHidden = false;
     idleAt = Date.now();
-    loadApps(function () { renderShelf(); renderDrawer(); updateFocus(); Data.refresh(); });
+    reopened();
   });
 
   I18N.set(Prefs.language());
