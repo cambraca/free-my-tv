@@ -97,7 +97,8 @@ final class Prefs {
     static boolean weather() { return sp().getBoolean("weather", true); }
     static void setWeather(boolean on) { put("weather", on); }
 
-    static boolean quotes() { return sp().getBoolean("quotes", Config.SHOW_CRYPTO); }
+    static boolean quotes() { return false; }
+    // static boolean quotes() { return sp().getBoolean("quotes", Config.SHOW_CRYPTO); }
     static void setQuotes(boolean on) { put("quotes", on); }
 
     static boolean coin(int i) { return sp().getBoolean("coin" + i, true); }

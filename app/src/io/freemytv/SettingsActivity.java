@@ -639,11 +639,11 @@ public class SettingsActivity extends Activity {
             l.add(Ui.tr("Tema", "Theme"));
             l.add(Ui.tr("Widget do clima", "Weather widget"));
             l.add(Ui.tr("Cidade", "City"));
-            l.add(Ui.tr("Widget de cotações", "Quotes widget"));
-            l.add("Bitcoin");
-            l.add("Ethereum");
-            l.add("Solana");
-            if (dollar()) l.add(Ui.tr("Dólar", "Dollar"));
+            // l.add(Ui.tr("Widget de cotações", "Quotes widget"));
+            // l.add("Bitcoin");
+            // l.add("Ethereum");
+            // l.add("Solana");
+            // if (dollar()) l.add(Ui.tr("Dólar", "Dollar"));
             return l.toArray(new String[0]);
         }
 
@@ -659,7 +659,7 @@ public class SettingsActivity extends Activity {
             v[2] = theme.equals("light") ? Ui.tr("Claro", "Light") : theme.equals("dark") ? Ui.tr("Escuro", "Dark") : Ui.tr("Automático", "Automatic");
             v[3] = onOff(Prefs.weather());
             v[CITY_ROW] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city();
-            v[5] = onOff(Prefs.quotes());
+            // v[5] = onOff(Prefs.quotes());
             // No quotes widget, nowhere to show prices: the coins read as off (and stay locked) until it is back on.
             for (int i = COIN_ROWS; i < v.length; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
             return v;
@@ -733,11 +733,8 @@ public class SettingsActivity extends Activity {
                 }
                 case 3: Prefs.setWeather(!Prefs.weather()); break;
                 case CITY_ROW: return;
-                case 5: Prefs.setQuotes(!Prefs.quotes()); break;
-                default:
-                    if (!Prefs.quotes()) return;
-                    Prefs.setCoin(focus - COIN_ROWS, !Prefs.coin(focus - COIN_ROWS));
-                    break;
+                // case 5: Prefs.setQuotes(!Prefs.quotes()); break;
+                default: return;
             }
             HomeData.get(getContext()).settingsChanged();
         }

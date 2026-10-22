@@ -39,7 +39,8 @@ number() {
 LAT="$(number latitude 40.7128)"
 LON="$(number longitude -74.0060)"
 ASSIST=false; [ "$(prop disable_assistant false)" = "true" ] && ASSIST=true
-CRYPTO=false; [ "$(prop show_crypto true)" = "true" ] && CRYPTO=true
+CRYPTO=false
+# CRYPTO=false; [ "$(prop show_crypto true)" = "true" ] && CRYPTO=true
 
 rm -rf out && mkdir -p out/gen/io/freemytv out/classes
 cat > out/gen/io/freemytv/Config.java <<EOF
