@@ -65,6 +65,8 @@ var I18N = (function () {
   function germanText(en) {
     if (Object.prototype.hasOwnProperty.call(german, en)) return german[en];
     var m = /^(\d+) (min|h) ago$/.exec(en);
+    var search = /^Search for “(.+)” in (.+)\.$/.exec(en);
+    if (search) return 'Suche nach „' + search[1] + '“ in ' + search[2] + '.';
     if (m) return 'vor ' + m[1] + (m[2] === 'min' ? ' Min.' : ' Std.');
     m = /^(\d+) seasons?$/.exec(en);
     if (m) return m[1] + (m[1] === '1' ? ' Staffel' : ' Staffeln');
@@ -141,6 +143,8 @@ var I18N = (function () {
 
   function russianText(en) {
     if (Object.prototype.hasOwnProperty.call(russian, en)) return russian[en];
+    var search = /^Search for “(.+)” in (.+)\.$/.exec(en);
+    if (search) return 'Найдите «' + search[1] + '» в ' + search[2] + '.';
     var m = /^(\d+) (min|h) ago$/.exec(en);
     if (m) return m[1] + (m[2] === 'min' ? ' мин назад' : ' ч назад');
     m = /^The shelf holds up to (\d+) apps\.$/.exec(en);

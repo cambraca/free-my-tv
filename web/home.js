@@ -593,11 +593,15 @@
 
   // MARK: - Opening things
 
-  function launcher(id, name) {
+  function launcher(id, name, pick) {
     return function () {
-      TV.launch(id, null, function (ok) {
+      function finished(ok) {
         if (!ok) toast(tr('Não deu para abrir ', "Couldn't open ", 'No se pudo abrir ') + (name || id));
-      });
+        else if (pick && !pick.url) toast(tr('Procure por “' + pick.title + '” em ' + name + '.',
+            'Search for “' + pick.title + '” in ' + name + '.', 'Busca “' + pick.title + '” en ' + name + '.'));
+      }
+      if (pick) TV.launchPick(id, pick, finished);
+      else TV.launch(id, null, finished);
     };
   }
 
@@ -622,7 +626,7 @@
         return;
       case Z.CARDS:
         var p = cards[st.card], app = p && Data.appFor(p.app);
-        if (app) launcher(app.id, app.title)();
+        if (app) launcher(app.id, app.title, p)();
         return;
       case Z.SHELF:
         if (shelf[st.shelf]) launcher(shelf[st.shelf].id, shelf[st.shelf].title)();

@@ -185,6 +185,13 @@ var TV = (function () {
       luna('luna://io.freemytv.watchlist/get', {refresh: true}, done);
     },
 
+    launchPick: function (id, pick, done) {
+      if (!pick.url) { this.launch(id, null, done); return; }
+      if (!webos) { this.launch(id, {contentTarget: pick.url}, done); return; }
+      if (pick.app === 'netflix') {
+        this.launch(id, {contentId: 'm=' + pick.url, contentTarget: pick.url}, done);
+      } else this.launch(id, {contentTarget: pick.url}, done);
+    },
     name: webos ? 'webos' : samsung ? 'tizen' : 'browser',
 
     /** Installed apps, as the TV's launcher lists them: [{id, title, icon, color}]. */
