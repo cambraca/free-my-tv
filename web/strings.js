@@ -7,6 +7,7 @@ var I18N = (function () {
 
   var lang = 'en';
   var german = {
+    "Start slideshow": "Diashow starten",
     "Movie": "Film",
     "TV show": "Serie",
     "Watch trailer": "Trailer ansehen",
@@ -92,6 +93,7 @@ var I18N = (function () {
   }
 
   var russian = {
+    "Start slideshow": "Запустить слайд-шоу",
     "Movie": "Фильм",
     "TV show": "Сериал",
     "Watch trailer": "Смотреть трейлер",

@@ -507,6 +507,8 @@
       step: function () {
         if (!Data.watchlistStatus().refreshing) { manualRefresh = true; Data.refreshWatchlist(); }
       }});
+    rows.push({label: tr('Iniciar apresentação', 'Start slideshow', 'Iniciar presentación'), value: '›',
+      step: function (d) { if (d >= 0) { closeSheets(); showSaver(); } }});
     rows.push({label: tr('Todos os Apps', 'All Apps', 'Todas las apps'), value: '›', step: function (d) { if (d >= 0) openApps(); }});
     rows.push({label: tr('Prateleira', 'Shelf', 'Estante'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('Ajustes da TV', 'TV Settings', 'Ajustes del TV'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
@@ -861,6 +863,7 @@
   var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, SAVER_AFTER = 5 * 60000;
 
   function showSaver() {
+    if (saverOn) return;
     var photos = Data.showcase().filter(function (p) { return p.backdrop && Data.appFor(p.app); });
     saverOn = true;
     var s = $('saver');
@@ -870,7 +873,8 @@
     var clock = el('div', 'clock', s);
     el('div', 'time', clock);
     el('div', 'date', clock);
-    el('div', 'title', clock);
+    var title = el('div', 'title', clock);
+    var meta = el('div', 'meta', clock);
     var front = a;
     function next() {
       if (!saverOn) return;
@@ -879,7 +883,8 @@
       if (p) {
         back.style.backgroundImage = 'url(' + Data.image(p.backdrop, 'w1280') + ')';
         back.style.webkitTransform = back.style.transform = 'scale(1.0)';
-        clock.lastChild.textContent = p.title;
+        title.textContent = p.title;
+        meta.textContent = p.meta || '';
         setTimeout(function () {
           setClass(back, 'on', true);
           setClass(front, 'on', false);
@@ -920,8 +925,10 @@
 
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
+    if (e.repeat && k === TV.keys.slideshow) { e.preventDefault(); return; }
     if (poke()) { e.preventDefault(); return; }   // the first press only wakes the screen
-    if (k === TV.keys.left) move(-1, 0);
+    if (k === TV.keys.slideshow) showSaver();
+    else if (k === TV.keys.left) move(-1, 0);
     else if (k === TV.keys.right) move(1, 0);
     else if (k === TV.keys.up) move(0, -1);
     else if (k === TV.keys.down) move(0, 1);

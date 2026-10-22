@@ -251,9 +251,10 @@ The web popup is called **Settings**, not **Home Settings**. Its visible rows ar
 
 1. Theme
 2. Refresh IMDb and Plex
-3. All Apps
-4. Shelf
-5. TV Settings
+3. Start slideshow
+4. All Apps
+5. Shelf
+6. TV Settings
 
 Language, Temperature, and Weather widget controls are intentionally hidden here, not removed from configuration
 or preferences. Crypto controls are disabled, not merely hidden. Preserve focus-row indices and the return from
@@ -261,6 +262,19 @@ the shelf editor after changing settings. Android keeps its separate native sett
 
 Key files: `web/index.html`, `web/home.js`, `web/home.css`, `web/data.js`, `web/strings.js`, `web/logos/`,
 `web/logo pato.png`.
+
+### Manual slideshow
+
+- The LG remote's blue button (keycode 406) starts the screensaver immediately while the app is open.
+  **Settings → Start slideshow** provides the same action for remotes without a blue button.
+  Ignore held-button repeats; the next key press or pointer movement dismisses the slideshow without activating
+  anything underneath. The blue shortcut preserves the current page/focus; the Settings action closes the menu.
+- Keep the existing image policy: deduplicate the three featured picks from each of Explore, Movies, and Shows,
+  then cycle their backdrops in order (at most nine titles), changing every 12 seconds with a gentle pan/zoom.
+  Only installed-service matches with artwork qualify; Unavailable titles and generic recommendations do not.
+  Selection inherits the featured recency/Plex weighting and session reshuffle. Images use `w1280`; the clock,
+  date, current title, and a smaller metadata line (year, genre, runtime/show count, service) remain visible.
+  Automatic activation still occurs after five idle minutes outside menus.
 
 ## Performance on LG webOS
 
