@@ -7,7 +7,7 @@
     python3 webos/build.py --generic  # without config.properties: the TV's time zone picks the city (releases)
 
 Reads config.properties (the same file as the Android build), puts the web home screen (web/), the app's symbols
-and font (app/assets), the coin logos (app/res/drawable) and webos/appinfo.json together, and packs them the way LG's
+and font (app/assets), the watchlist background service and webos/appinfo.json together, and packs them the way LG's
 ares-package does (an ar archive with control.tar.gz and data.tar.gz), so no LG tools are needed. Python 3 only.
 """
 import io
@@ -75,11 +75,28 @@ def build(preview, config):
             dirs.add(parent)
             entries.append((base + '/' + parent, None))
         entries.append((base + '/' + path, app[path]))
-    package = json.dumps({'id': app_id, 'version': version, 'app': app_id}, indent=2).encode('utf-8')
+    service_id = app_id + '.watchlist'
+    service_base = 'usr/palm/services/' + service_id
+    entries += [('usr/palm/services', None), (service_base, None)]
+    service_files = {}
+    service_directory = os.path.join(ROOT, 'webos', 'service')
+    for name in sorted(os.listdir(service_directory)):
+        if name.endswith(('.js', '.json')):
+            with open(os.path.join(service_directory, name), 'rb') as handle:
+                service_files[name] = handle.read()
+    for name, path in (('watchlist.js', 'web/watchlist.js'), ('watchlist-network.js', 'tools/watchlist-network.js')):
+        with open(os.path.join(ROOT, path), 'rb') as handle:
+            service_files[name] = handle.read()
+    service_files['config.json'] = json.dumps(config).encode('utf-8')
+    service_files['watchlist-seed.json'] = app.pop('watchlist-service-seed.json')
+    for name, content in service_files.items():
+        entries.append((service_base + '/' + name, content))
+    entries = [entry for entry in entries if not entry[0].endswith('/watchlist-service-seed.json')]
+    package = json.dumps({'id': app_id, 'version': version, 'app': app_id, 'services': [service_id]}, indent=2).encode('utf-8')
     entries += [('usr/palm/packages', None), ('usr/palm/packages/' + app_id, None),
                 ('usr/palm/packages/' + app_id + '/packageinfo.json', package)]
 
-    size = sum(len(d) for d in app.values()) + len(package)
+    size = sum(len(data) for data in app.values()) + sum(len(data) for data in service_files.values()) + len(package)
     control = ('Package: %s\nVersion: %s\nSection: misc\nPriority: optional\nArchitecture: all\nInstalled-Size: %d\n'
                'Maintainer: Free My TV <https://freemytv.io>\nDescription: A fast, ad-free home screen.\n'
                'webOS-Package-Format-Version: 2\nwebOS-Packager-Version: 1.0.0\n' % (app_id, version, size))
@@ -92,8 +109,10 @@ def build(preview, config):
         webapp.preview(app, OUT)
         print('Preview: open out/webos/index.html (or serve out/webos) in a browser.')
     print('Built %s (%s %s, %d KB)' % (os.path.basename(IPK), app_id, version, len(data) // 1024))
-    if not config['tmdbKey']:
-        print('No TMDB key: the picks stay off (everything else works).')
+    if not config.get('imdbUserId'):
+        print('No IMDb user ID: set imdb_user_id in config.properties to enable watchlist picks.')
+    elif not config['tmdbKey']:
+        print('No TMDB key: watchlist picks are limited to matches in your Plex library.')
 
 
 if __name__ == '__main__':

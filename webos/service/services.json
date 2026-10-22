@@ -1,0 +1,5 @@
+{
+  "id": "io.freemytv.watchlist",
+  "description": "IMDb watchlist and local Plex library matching",
+  "services": [{"name": "io.freemytv.watchlist"}]
+}

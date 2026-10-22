@@ -178,6 +178,13 @@ var TV = (function () {
   // MARK: - The TV, whichever it is
 
   return {
+    isWebOS: webos,
+    isPreview: !!window.FMTV_PREVIEW,
+
+    watchlist: function (done) {
+      luna('luna://io.freemytv.watchlist/get', {refresh: true}, done);
+    },
+
     name: webos ? 'webos' : samsung ? 'tizen' : 'browser',
 
     /** Installed apps, as the TV's launcher lists them: [{id, title, icon, color}]. */
