@@ -281,14 +281,7 @@ var Data = (function () {
   }
 
   function all() {
-    var out = [], seen = {}, kinds = [null, 'movie', 'tv'];
-    for (var kindIndex = 0; kindIndex < kinds.length; kindIndex++) {
-      var list = now(kinds[kindIndex]);
-      for (var index = 0; index < list.length; index++) {
-        if (!seen[list[index].id]) { seen[list[index].id] = true; out.push(list[index]); }
-      }
-    }
-    return out;
+    return browse(null);
   }
 
   var detailCache = {}, detailPending = {};

@@ -269,10 +269,11 @@ Key files: `web/index.html`, `web/home.js`, `web/home.css`, `web/data.js`, `web/
   **Settings → Start slideshow** provides the same action for remotes without a blue button.
   Ignore held-button repeats; the next key press or pointer movement dismisses the slideshow without activating
   anything underneath. The blue shortcut preserves the current page/focus; the Settings action closes the menu.
-- Keep the existing image policy: deduplicate the three featured picks from each of Explore, Movies, and Shows,
-  then cycle their backdrops in order (at most nine titles), changing every 12 seconds with a gentle pan/zoom.
+- Use the full larger Explore grid as the slideshow pool, cycling its backdrops in the same uniformly shuffled
+  session order, changing every 12 seconds with a gentle pan/zoom. Do not limit the pool to featured titles.
   Only installed-service matches with artwork qualify; Unavailable titles and generic recommendations do not.
-  Selection inherits the featured recency/Plex weighting and session reshuffle. Images use `w1280`; the clock,
+  Selection has no recency/Plex weighting; Plex remains the preferred service for matching titles. The order
+  reshuffles with the Explore grid on a new session. Images use `w1280`; the clock,
   date, current title, and a smaller metadata line (year, genre, runtime/show count, service) remain visible.
   Automatic activation still occurs after five idle minutes outside menus.
 
