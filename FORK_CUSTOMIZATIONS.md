@@ -156,7 +156,10 @@ These two selection policies are deliberately different. Do not share one orderi
 
 - Featured picks reshuffle on a new load, native relaunch, or return from a hidden/background state. Use a new
   session seed, avoid the previous featured three when enough alternatives exist, and keep picks stable during
-  ordinary browsing. Deduplicate near-simultaneous foreground/relaunch events rather than reshuffling twice.
+  ordinary browsing. Keep each tab's selected IDs for the session when app discovery or a background snapshot
+  invalidates its catalogue; update their metadata/launch links and replace only titles no longer available.
+  A cold-start `webOSRelaunch` must not start a second session. Only a real hidden-to-foreground transition starts
+  another session in the running app, consuming that transition once across visibility/relaunch events.
 - The grid uses `Watchlist.browse` / `Data.browse`; the featured cards use their separate weighted catalogue.
   Plex is still the preferred launch provider for an Explore-grid title, even though its position is unweighted.
 - Remember the selected Explore/Movies/Shows tab across app launches. Each tab also retains its grid position
@@ -270,6 +273,11 @@ card reuse, image request sizes, stable catalogues on status polls, and no cache
   even within the usual freshness window, retaining their complete cached data if the server is unavailable.
   Preserve IMDb/metadata caches during this migration. A successful scan without native GUIDs (older agents)
   remains valid and opens Plex with a title-search fallback; do not repeatedly rescan it for missing GUIDs.
+- A selected Plex title from an old UI/build seed must not wait for an entire background sync. The Luna
+  `plexTarget` method resolves its IMDb match against the service snapshot, reusing a known native GUID or fetching
+  only `/library/metadata/<ratingKey>?includeGuids=1` from the configured server. Verify the returned IMDb/TMDB
+  identity before launching, cache the GUID in memory, and fail safely if the title was removed or Plex is offline.
+  Never accept an arbitrary server URL from a launch request or expose the Plex token in launch parameters.
 - MUBI publishes an empty LG `contentTarget`, checked for *Bouchra* and *Belle* through JustWatch on 2026-10-22.
   Its website URLs opened only the app on this TV. Open MUBI normally and report the title-search fallback;
   do not report a website URL as successful native title navigation or invent numeric targets. Keep its web

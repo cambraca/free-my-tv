@@ -159,7 +159,7 @@ var Data = (function () {
   window.WATCHLIST_SEED = null;
   var fetchingRecs = false, pollingRecs = false, pollTimer = 0, recsError = '';
   var active = !document.hidden, nextRecsAt = 0, savedRecsAt = snapshot ? snapshot.updatedAt : 0;
-  var sessionSeed = '', sessionAt = 0, catalogs = {}, browseCatalogs = {}, previousFeatured = {}, featured = {};
+  var sessionSeed = '', sessionAt = 0, catalogs = {}, browseCatalogs = {}, previousFeatured = {}, featured = {}, sessionFeatured = {};
 
   function startSession() {
     if (sessionAt && Date.now() - sessionAt < 1000) return;
@@ -171,6 +171,7 @@ var Data = (function () {
     for (var key in previousFeatured) if (previousFeatured.hasOwnProperty(key)) featured[key] = previousFeatured[key];
     catalogs = {};
     browseCatalogs = {};
+    sessionFeatured = {};
   }
 
   startSession();
@@ -182,8 +183,20 @@ var Data = (function () {
       return (CONFIG.watchlistServices || []).indexOf(service) >= 0 && !!appFor(service);
     }, sessionSeed, null);
     var previous = previousFeatured[key] || [], chosen = [], selected = {};
+    var retained = sessionFeatured[key] || [];
+    for (var retainedIndex = 0; retainedIndex < retained.length; retainedIndex++) {
+      for (var listIndex = 0; listIndex < list.length; listIndex++) {
+        if (list[listIndex].id === retained[retainedIndex]) {
+          chosen.push(list[listIndex]);
+          selected[list[listIndex].id] = true;
+          break;
+        }
+      }
+    }
     for (var index = 0; index < list.length && chosen.length < 3; index++) {
-      if (previous.indexOf(list[index].id) < 0) { chosen.push(list[index]); selected[list[index].id] = true; }
+      if (!selected[list[index].id] && previous.indexOf(list[index].id) < 0) {
+        chosen.push(list[index]); selected[list[index].id] = true;
+      }
     }
     for (var remaining = 0; remaining < list.length && chosen.length < 3; remaining++) {
       if (!selected[list[remaining].id]) { chosen.push(list[remaining]); selected[list[remaining].id] = true; }
@@ -191,6 +204,7 @@ var Data = (function () {
     catalogs[key] = chosen.concat(list.filter(function (pick) { return !selected[pick.id]; }));
     if (chosen.length) {
       featured[key] = chosen.map(function (pick) { return pick.id; });
+      sessionFeatured[key] = featured[key];
       store('featured', {source: Watchlist.source(CONFIG), tabs: featured});
     }
     return catalogs[key];

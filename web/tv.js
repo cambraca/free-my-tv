@@ -317,6 +317,16 @@ var TV = (function () {
           + encodeURIComponent('http://api-global.netflix.com/catalog/titles/movies/' + match[1])} : null;
       } else if (webos && pick.app === 'plex') {
         params = /^plex:\/\/(?:movie|show)\/[a-f0-9]{24}$/i.test(pick.url || '') ? {contentTarget: pick.url} : null;
+        if (!params) {
+          luna('luna://io.freemytv.watchlist/plexTarget', {imdbId: pick.imdbId || pick.id}, function (result) {
+            if (!result || !/^plex:\/\/(?:movie|show)\/[a-f0-9]{24}$/i.test(result.url || '')) { fallback(); return; }
+            bridge.launch(id, {contentTarget: result.url}, function (ok) {
+              if (!ok) fallback();
+              else if (done) done(true, true);
+            });
+          });
+          return;
+        }
       } else if (webos && pick.app === 'mubi') {
         params = null;
       }

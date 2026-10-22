@@ -54,3 +54,13 @@ service.register('get', function (message) {
   if (loading) waiting.push(respond);
   else respond();
 });
+
+service.register('plexTarget', function (message) {
+  function respond() {
+    Watchlist.plexTarget(config, snapshot, message.payload.imdbId, request, function (err, url) {
+      message.respond({returnValue: !err, url: url || ''});
+    });
+  }
+  if (loading) waiting.push(respond);
+  else respond();
+});

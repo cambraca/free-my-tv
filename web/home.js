@@ -868,7 +868,6 @@
   function renderAll() {
     renderTop();
     renderWatchlistStatus();
-    cards = [];
     renderCards();
     renderShelf();
     renderDrawer();
@@ -928,7 +927,10 @@
 
   function reopened() {
     if (window.PalmSystem && window.PalmSystem.activate) window.PalmSystem.activate();
-    Data.startSession();
+    if (wasHidden) {
+      wasHidden = false;
+      Data.startSession();
+    }
     reset();
     loadApps(function () { renderAll(); Data.refresh(); });
   }
@@ -940,8 +942,7 @@
   document.addEventListener('visibilitychange', function () {
     Data.setActive(!document.hidden);
     if (document.hidden) { wasHidden = true; hideSaver(); return; }
-    if (!wasHidden) return;
-    wasHidden = false;
+    if (!wasHidden) { Data.refresh(); return; }
     idleAt = Date.now();
     reopened();
   });

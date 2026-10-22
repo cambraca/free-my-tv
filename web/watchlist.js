@@ -202,6 +202,39 @@
     return value.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
   }
 
+  function plexTarget(config, snapshot, imdbId, request, done) {
+    if (!valid(snapshot, config) || !/^tt\d+$/.test(imdbId || '') || !config.plexHost) {
+      done(new Error('Plex title data is unavailable.')); return;
+    }
+    var entry = null;
+    for (var index = 0; index < snapshot.entries.length; index++) {
+      if (snapshot.entries[index].imdbId === imdbId) { entry = snapshot.entries[index]; break; }
+    }
+    var items = snapshot.plex && snapshot.plex.items || {}, resolved = entry && entry.resolved;
+    var local = entry && (items['imdb:' + imdbId] || resolved && items[resolved.kind + ':' + resolved.id]);
+    if (!local || !/^\d+$/.test(local.ratingKey || '')) {
+      done(new Error('Plex library match is unavailable.')); return;
+    }
+    if (/^plex:\/\/(?:movie|show)\/[a-f0-9]{24}$/i.test(local.guid || '')) { done(null, local.guid); return; }
+    request('GET', plexBase(config) + '/library/metadata/' + encodeURIComponent(local.ratingKey) + '?includeGuids=1',
+      config.plexToken ? {Accept: 'application/json', 'X-Plex-Token': config.plexToken} : {Accept: 'application/json'}, null,
+      function (err, data) {
+        if (err) { done(err); return; }
+        var metadata = data && data.MediaContainer && data.MediaContainer.Metadata || [], item = metadata[0];
+        var guids = item && item.Guid || [], matched = false;
+        for (var guidIndex = 0; guidIndex < guids.length; guidIndex++) {
+          if (guids[guidIndex].id === 'imdb://' + imdbId || resolved
+              && guids[guidIndex].id === 'tmdb://' + resolved.id) matched = true;
+        }
+        if (!item || !matched || String(item.ratingKey) !== String(local.ratingKey)
+            || !/^plex:\/\/(?:movie|show)\/[a-f0-9]{24}$/i.test(item.guid || '')) {
+          done(new Error('Plex returned no matching native title link.')); return;
+        }
+        local.guid = item.guid;
+        done(null, item.guid);
+      });
+  }
+
   function providerLinks(html) {
     var links = {}, expression = /<a\b[^>]*href=["']([^"']+)["'][^>]*>/gi, match;
     while ((match = expression.exec(html))) {
@@ -430,6 +463,6 @@
   }
 
   return {source: source, valid: valid, fresh: fresh, notesReady: notesReady, plexLinksReady: plexLinksReady, clientSnapshot: clientSnapshot,
-    crawl: crawl, scanPlex: scanPlex, providerLinks: providerLinks,
+    crawl: crawl, scanPlex: scanPlex, plexTarget: plexTarget, providerLinks: providerLinks,
     sync: sync, select: select, browse: browse};
 });
