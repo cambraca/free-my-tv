@@ -42,6 +42,47 @@ var TV = (function () {
     bridge.call(uri, JSON.stringify(params || {}));
   }
 
+  // webOS 6 gives Developer Mode apps only the "public" group, which leaves out listLaunchPoints. There the list comes
+  // from the TV's remote control API on 127.0.0.1:3000 (the one LG's phone app uses), which takes file:// pages.
+  // The TV asks once to allow it; the key it gives back is kept.
+  var SSAP_KEY = 'fmtv.ssapKey', SSAP_REFUSED = 'fmtv.ssapRefused';
+
+  /** One call to the remote control API; done(result) with null on failure. */
+  function ssap(uri, done) {
+    var ws = null, finished = false, key = null;
+    var timer = setTimeout(function () { finish(null); }, 90000);   // time to answer the TV's prompt
+    function finish(result) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      try { ws.close(); } catch (e) {}
+      done(result);
+    }
+    try { key = localStorage.getItem(SSAP_KEY); } catch (e) {}
+    try { ws = new WebSocket('ws://127.0.0.1:3000'); } catch (e) { finish(null); return; }
+    ws.onopen = function () {
+      var payload = {forcePairing: false, pairingType: 'PROMPT',
+        manifest: {manifestVersion: 1, appVersion: '1.0', permissions: ['READ_INSTALLED_APPS']}};
+      if (key) payload['client-key'] = key;
+      ws.send(JSON.stringify({type: 'register', id: 'register', payload: payload}));
+    };
+    ws.onmessage = function (event) {
+      var m = null;
+      try { m = JSON.parse(event.data); } catch (e) {}
+      if (!m) return;
+      if (m.type === 'registered') {
+        try { localStorage.setItem(SSAP_KEY, m.payload['client-key']); } catch (e) {}
+        ws.send(JSON.stringify({type: 'request', id: 'call', uri: 'ssap://' + uri}));
+      } else if (m.id === 'call' || m.type === 'error') {
+        if (m.id === 'register' && m.type === 'error') {
+          try { localStorage.setItem(SSAP_REFUSED, '1'); } catch (e) {}   // the person said no on the TV
+        }
+        finish(m.type !== 'error' && m.payload && m.payload.returnValue !== false ? m.payload : null);
+      }
+    };
+    ws.onerror = ws.onclose = function () { finish(null); };
+  }
+
   // LG inputs: the antenna and the four HDMI ports, with the apps LG opens for them.
   // var INPUTS = [
   //   {id: 'com.webos.app.livetv', key: 'live', label: null, symbol: 'live_tv'},
@@ -56,7 +97,43 @@ var TV = (function () {
 
   // Not shown among Samsung's apps: Smart Hub's own pieces, the platform's tools and players (but its browser and
   // Netflix, which live there too), services, keyboards and ad players. The rest is what Smart Hub shows.
-  var SAMSUNG_HIDDEN = /^(org\.volt\.|org\.tizen\.(?!browser$|netflix)|ise-|d75857a5-)|Service$|[Dd]aemon|Preview$|syspopup|[Hh]elper$|AdPlayer|AdSuite|[Kk]eyboard/;
+  // Tizen 4 also lists Samsung's own pieces: the YouTube engine's hosts (cobalt-*: "App", "Youtube", "YoutubeTV"),
+  // Bixby, search, previews, the weather and notification popups, Apple TV's stand-in and engine.
+  var SAMSUNG_HIDDEN = new RegExp('^(org\\.volt\\.|org\\.tizen\\.(?!browser$|netflix)|org\\.tizen\\.netflixlowmem$|ise-|ug-|d75857a5-)' +
+      '|[Ss]ervice$|[Dd]aemon|Preview$|syspopup|[Hh]elper$|AdPlayer|AdSuite|[Kk]eyboard|\\.OTApp$' +
+      '|^com\\.samsung\\.(calendar-account-manager|tv\\.(cobalt-|aria-(dummy|engine)|airplay-app|ambient-support|' +
+      'built-in-app-info-viewer|commonsearch|searchall|preview-|tv-scheduler|csfs|notification-app|mycontents|' +
+      'safLaunchBridge|shortcut|remote-workspace|voiceassistant|mybixby|weather-viewer))');
+
+  // Samsung apps whose iconPath is Tizen's generic pinwheel (a valid image, so onerror never fires): our own icons.
+  // Seen on a 2018 NU7675 (Tizen 4); Smart Hub draws their real icons from a folder apps can't read. On a 2017
+  // MU6100 (Tizen 3) no iconPath loads at all, so common apps get a logo here: Simple Icons' (CC0), cropped and tinted
+  // for the tiles, with a width and height so old WebKit sizes them like PNGs.
+  var SAMSUNG_ICONS = {
+    '9Ur5IzDKqV.TizenYouTube': 'icons/youtube.png',
+    'evKhCgZelL.AmazonIgnitionLauncher2': 'icons/prime.png',
+    'RN1MCdNq8t.Netflix': 'icons/netflix.svg',
+    'org.tizen.netflix-app': 'icons/netflix.svg',
+    'NvZ26VG9Yw.HBOGOLAG': 'icons/max.svg',
+    'rJeHak5zRg.Spotify': 'icons/spotify.svg',
+    'cexr1qp97S.Deezer': 'icons/deezer.svg',
+    '5SLwh7m3En.TizenYouTubeKids': 'icons/youtubekids.svg',
+    '4OAwqypfRT.RedBullTV': 'icons/redbull.svg',
+    'UCJa2s9hhC.TED': 'icons/ted.svg',
+    'QizQxC7CUf.PlayMovies': 'icons/googleplay.svg',
+    'vIutycUzou.SteamLink': 'icons/steam.svg',
+    'geUOM7qimf.FOXPlay': 'icons/fox.svg'
+  };
+
+  // Names Smart Hub gets wrong: HBO's app has none (so it never reached the shelf), others are long or old.
+  var SAMSUNG_TITLES = {
+    'NvZ26VG9Yw.HBOGOLAG': 'Max',
+    'rJeHak5zRg.Spotify': 'Spotify',
+    'evKhCgZelL.AmazonIgnitionLauncher2': 'Prime Video'
+  };
+
+  // Samsung's settings menu on Tizen 3, which answers no "settings" app control.
+  var SAMSUNG_MENU = 'org.tizen.menu';
 
   // Samsung's live TV viewer: it shows whichever source the TV is on (the antenna, or the HDMI picked here).
   // var SAMSUNG_VIEWER = 'org.tizen.tv-viewer';
@@ -77,6 +154,32 @@ var TV = (function () {
     // ['com.palm.app.settings', 'Settings', '#8E8E93']
   ];
 
+  // Newer webOS (11 tested) denies listLaunchPoints to Developer Mode apps, but still answers getAppLoadStatus for
+  // one app id: these are checked one by one there. Their icons can't be read, so the shelf shows their names.
+  var KNOWN = [
+    ['netflix', 'Netflix'], ['youtube.leanback.v4', 'YouTube'], ['com.mubi', 'MUBI'], ['amazon', 'Prime Video'],
+    ['com.disney.disneyplus-prod', 'Disney+'], ['com.wbd.stream', 'HBO Max'], ['com.hbo.hbomax', 'Max'],
+    ['com.apple.appletv', 'Apple TV'], ['hulu', 'Hulu'], ['com.peacock.tv', 'Peacock'], ['com.nfl.app', 'NFL'],
+    ['globoplaywebos', 'Globoplay'], ['spotify-beehive', 'Spotify'], ['tv.twitch.tv.starshot.lg', 'Twitch'],
+    ['cdp-30', 'Plex'], ['com.crunchyroll.webapp', 'Crunchyroll'], ['com.webos.app.browser', 'Web Browser']
+  ];
+
+  function knownApps(done) {
+    var found = [], left = KNOWN.length, sent = false;
+    function finish() {
+      if (sent) return;
+      sent = true;
+      done(found.filter(function (x) { return x; }));
+    }
+    setTimeout(finish, 5000);   // an id that never answers doesn't hold the rest
+    KNOWN.forEach(function (k, i) {
+      luna('luna://com.webos.applicationManager/getAppLoadStatus', {appId: k[0]}, function (res) {
+        if (res && res.exist) found[i] = {id: k[0], title: k[1], icon: '', color: ''};
+        if (--left === 0) finish();
+      });
+    });
+  }
+
   var self = 'io.freemytv';
   if (webos && window.PalmSystem && window.PalmSystem.identifier) self = window.PalmSystem.identifier.split(' ')[0];
   if (samsung) {
@@ -94,8 +197,12 @@ var TV = (function () {
           if (!a.id || a.show === false || a.id === self || SAMSUNG_HIDDEN.test(a.id)) continue;
           var icon = a.iconPath || '';
           if (icon && icon.indexOf('://') < 0) icon = 'file://' + icon;
-          out.push({id: a.id, title: a.name || a.id, icon: icon, color: ''});
+          if (SAMSUNG_ICONS[a.id]) icon = SAMSUNG_ICONS[a.id];
+          out.push({id: a.id, title: SAMSUNG_TITLES[a.id] || a.name || a.id, icon: icon, color: ''});
         }
+        // The built-in Netflix stays only when the store's Netflix isn't installed.
+        var store = out.some(function (x) { return /\.Netflix$/.test(x.id); });
+        if (store) out = out.filter(function (x) { return x.id.indexOf('org.tizen.netflix') !== 0; });
         // Smart Hub keeps its own order, which isn't readable: the same alphabetical order as All Apps elsewhere.
         out.sort(function (x, y) { var a = x.title.toLowerCase(), b = y.title.toLowerCase(); return a < b ? -1 : a > b ? 1 : 0; });
         done(out);
@@ -164,14 +271,14 @@ var TV = (function () {
   //   });
   // }
 
-  /** Samsung's settings: whichever app answers the platform's "settings" request. */
+  /** Samsung's settings: whichever app answers the platform's "settings" request, else the TV's menu (Tizen 3). */
   function samsungSettings(done) {
+    function menu() { samsungLaunch(SAMSUNG_MENU, done); }
     try {
       var control = new window.tizen.ApplicationControl('http://tizen.org/appcontrol/operation/setting', null, null, null, []);
-      window.tizen.application.launchAppControl(control, null, function () { if (done) done(true); },
-          function () { if (done) done(false); });
+      window.tizen.application.launchAppControl(control, null, function () { if (done) done(true); }, menu);
     } catch (e) {
-      if (done) done(false);
+      menu();
     }
   }
 
@@ -214,18 +321,31 @@ var TV = (function () {
         done(SAMPLE.map(function (s) { return {id: s[0], title: s[1], icon: '', color: s[2]}; }));
         return;
       }
-      luna('luna://com.webos.applicationManager/listLaunchPoints', {}, function (res) {
-        // Some webOS builds deny listing apps to sideloaded apps ("Denied method call listLaunchPoints") even
-        // with requiredPermissions set; launch(id) still works there, so fall back to common LG app ids.
-        if (!res) { done(SAMPLE.map(function (s) { return {id: s[0], title: s[1], icon: '', color: s[2]}; })); return; }
+      function list(res) {
         var out = [];
-        var points = res.launchPoints || [];
+        var points = res && res.launchPoints ? res.launchPoints : [];
         for (var i = 0; i < points.length; i++) {
           var p = points[i];
           if (!p.id || p.id === self || HIDDEN.test(p.id)) continue;
           out.push({id: p.id, title: p.title || p.id, icon: p.largeIcon || p.icon || '', color: p.bgColor || p.iconColor || ''});
         }
-        done(out);
+        return out;
+      }
+      luna('luna://com.webos.applicationManager/listLaunchPoints', {}, function (res) {
+        if (res) { done(list(res)); return; }
+        // Denied to Developer Mode apps (webOS 6 and newer): once the TV has allowed the remote control API, it lists
+        // every app with its icon; until then, the known apps the TV says it has, while the TV asks once (an answer
+        // only counts from the next load on, and a "no" isn't asked again).
+        var paired = false, refused = false;
+        try { paired = !!localStorage.getItem(SSAP_KEY); refused = !!localStorage.getItem(SSAP_REFUSED); } catch (e) {}
+        if (paired) {
+          ssap('com.webos.applicationManager/listLaunchPoints', function (res2) {
+            if (res2) done(list(res2)); else knownApps(done);
+          });
+          return;
+        }
+        knownApps(done);
+        if (!refused) ssap('com.webos.applicationManager/listLaunchPoints', function () {});
       });
     },
 

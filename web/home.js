@@ -907,6 +907,7 @@
   });
 
   function reopened() {
+    if (window.PalmSystem && window.PalmSystem.activate) window.PalmSystem.activate();
     Data.startSession();
     reset();
     loadApps(function () { renderAll(); Data.refresh(); });

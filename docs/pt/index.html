@@ -205,7 +205,7 @@
       </div>
       <div class="panel" data-reveal>
         <div class="tabs" role="tablist" aria-label="Forma de instalar">
-          <button role="tab" aria-selected="true" aria-controls="tab-claude" id="t-claude">Com o Claude Code</button>
+          <button role="tab" aria-selected="true" aria-controls="tab-claude" id="t-claude">Com IA</button>
           <button role="tab" aria-selected="false" aria-controls="tab-manual" id="t-manual">Manual</button>
           <button role="tab" aria-selected="false" aria-controls="tab-lg" id="t-lg">TVs LG</button>
           <button role="tab" aria-selected="false" aria-controls="tab-samsung" id="t-samsung">TVs Samsung</button>
@@ -214,12 +214,9 @@
         <div class="tabpanel" id="tab-claude" role="tabpanel" aria-labelledby="t-claude">
           <ol class="howto">
             <li><b>Na TV:</b> Configurações → Sistema → Sobre → aperte 7 vezes no item <em>Build</em> (o último da lista). De volta em Sistema, abra <em>Opções do desenvolvedor</em> e ative a <em>Depuração USB</em>. Anote o endereço IP da TV (Configurações → Rede e Internet).</li>
-            <li><b>No computador:</b> baixe o código.
-              <div class="code"><code>git clone https://github.com/simbasjungles/free-my-tv &amp;&amp; cd free-my-tv</code><button class="copy-btn" type="button" aria-label="Copiar comando">Copiar</button></div>
-            </li>
-            <li><b>Abra o Claude Code nessa pasta e diga:</b>
-              <div class="code prompt"><code>Instale o Free My TV na minha TV em 192.168.1.50. Eu moro em São Paulo.</code><button class="copy-btn" type="button" aria-label="Copiar pedido">Copiar</button></div>
-              Ele instala o que falta, compila o app e coloca na sua TV. Troque pelo IP da sua TV e pela sua cidade.
+            <li><b>No computador:</b> abra um assistente de IA (Claude Code, Codex ou Antigravity) e diga:
+              <div class="code prompt"><code>Instale o Free My TV (github.com/simbasjungles/free-my-tv) na minha TV em 192.168.1.50. Eu moro em São Paulo.</code><button class="copy-btn" type="button" aria-label="Copiar pedido">Copiar</button></div>
+              Ele baixa o código, instala o que falta, compila o app e coloca na sua TV, e pede a sua permissão antes de qualquer coisa importante. Troque pelo IP da sua TV e pela sua cidade.
             </li>
             <li><b>De volta na TV:</b> abra <em>Free My TV</em> → <em>Início</em> → <em>Free My TV</em> e aceite o aviso de depuração (marque <em>Sempre permitir</em>).</li>
           </ol>
@@ -298,8 +295,8 @@
         <details><summary>Funciona em TV LG?</summary><p>Funciona. Na LG ele é instalado pelo próprio Developer Mode da LG, sem root e sem mudar nada na TV, e abre com um toque numa tecla numérica. A mesma tela inicial, com destaques, clima e cotações. Aperte EXTEND no app Developer Mode uma vez por mês para mantê-lo.</p></details>
         <details><summary>Funciona em TV Samsung?</summary><p>Funciona, nas TVs Samsung de 2017 em diante. Ele é instalado pelo próprio Developer Mode da Samsung com o TizenBrew Installer, o instalador da comunidade, sem root e sem mudar nada na TV. A mesma tela inicial, clima e cotações, com a sua cidade pelo fuso da TV. Para os destaques, o Claude Code compila com a sua chave grátis do TMDB.</p></details>
         <details><summary>Dá para deixar do meu jeito?</summary><p>Essa é a ideia. Abra a pasta no Claude Code e é só pedir: "coloque o Crunchyroll na prateleira", "mostre as cotações em reais", "configure para a minha Sony". Ele muda o código, compila o app e coloca na sua TV.</p></details>
-        <details><summary>Fica em português?</summary><p>Fica. O app segue o idioma da TV (português, inglês, espanhol, russo ou alemão), ou o que você escolher nos ajustes dele. Quer outro idioma? Peça ao Claude.</p></details>
-        <details><summary>Ele coleta algum dado?</summary><p>Não. Sem contas, sem análises, sem rastreamento. Ele só fala com o TMDB (destaques), o Open-Meteo (clima, da sua cidade) e a Binance (cotações).</p></details>
+        <details><summary>Fica em português?</summary><p>Fica. O app segue o idioma da TV (português, inglês, espanhol, russo ou alemão; no Google TV também francês, italiano, japonês e mais 16), ou o que você escolher nos ajustes dele. Quer outro idioma? Peça ao Claude.</p></details>
+        <details><summary>Ele coleta algum dado?</summary><p>Não. Sem contas, sem análises, sem rastreamento. Ele só fala com o TMDB (destaques), o Open-Meteo (clima, da sua cidade) e a Binance (cotações), e o Watchmode (links dos títulos) só se você colocar a chave dele.</p></details>
         <details><summary>É grátis?</summary><p>Sim. Licença MIT, e a chave do TMDB também é grátis.</p></details>
       </div>
     </section>
@@ -318,7 +315,7 @@
   <footer class="foot">
     <div class="brand"><img src="../assets/icon-512.png" alt="" width="24" height="24"><span>Free My TV</span></div>
     <p>Feito com Claude Code. Licença MIT. Sem ligação com o Google, a TCL, a LG, a Samsung ou qualquer serviço de streaming; nomes e logos dos apps pertencem aos seus donos.</p>
-    <p>Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB. Dados do clima por <a href="https://open-meteo.com/" rel="noopener">Open-Meteo.com</a> (CC BY 4.0). Cotações da Binance. Ícones: Material Symbols. Fonte: Inter.</p>
+    <p>Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB. Dados do clima por <a href="https://open-meteo.com/" rel="noopener">Open-Meteo.com</a> (CC BY 4.0). Cotações da Binance. Links dos títulos por <a href="https://api.watchmode.com/" rel="noopener">Watchmode</a>. Ícones: Material Symbols. Fonte: Inter.</p>
   </footer>
 
   <dialog class="film" id="film" aria-label="O filme do Free My TV">
