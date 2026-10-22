@@ -280,6 +280,10 @@
           backdrop: backdrop || detail.poster_path || '', services: services, links: {},
           meta: [entry.year, detail.genres && detail.genres[0] && detail.genres[0].name,
             kind === 'movie' && detail.runtime ? duration(detail.runtime) : ''].filter(Boolean).join(' · ')};
+        if (kind === 'tv') {
+          result.seasons = Number(detail.number_of_seasons) || 0;
+          result.episodes = Number(detail.number_of_episodes) || 0;
+        }
         if (!services.length) { done(null, result); return; }
         request('GET', 'https://www.themoviedb.org/' + kind + '/' + item.id + '/watch?locale='
             + encodeURIComponent((config.tmdbRegion || 'US').toUpperCase()), {Accept: 'text/html'}, null,
@@ -323,6 +327,7 @@
       picks.push({id: entry.imdbId, imdbId: entry.imdbId, kind: resolved ? resolved.kind : local ? local.kind : entry.kind,
         title: resolved && resolved.title || local && local.title || entry.title, backdrop: backdrop,
         meta: formatMeta(resolved && resolved.meta || String(entry.year || '')), note: entry.note || '',
+        seasons: resolved && resolved.seasons, episodes: resolved && resolved.episodes,
         options: options, rank: entry.rank, addedAt: entry.addedAt});
     }
     return picks;

@@ -176,12 +176,33 @@ var Data = (function () {
 
   startSession();
 
+  function withTvCounts(pick) {
+    if (pick.kind !== 'tv') return pick;
+    var counts = [];
+    function count(value, season) {
+      if (!(value > 0) || !isFinite(value) || Math.floor(value) !== value) return;
+      var singular = value === 1;
+      counts.push(season ? tr(value + (singular ? ' temporada' : ' temporadas'),
+        value + (singular ? ' season' : ' seasons'), value + (singular ? ' temporada' : ' temporadas'))
+        : tr(value + (singular ? ' episódio' : ' episódios'), value + (singular ? ' episode' : ' episodes'),
+          value + (singular ? ' episodio' : ' episodios')));
+    }
+    if (pick.seasons > 1) count(pick.seasons, true);
+    else if (pick.seasons === 1) count(pick.episodes, false);
+    if (counts.length) {
+      var meta = pick.meta || '', suffix = pick.service ? ' · ' + pick.service : '';
+      if (suffix && meta.slice(-suffix.length) === suffix) meta = meta.slice(0, -suffix.length);
+      pick.meta = [meta, counts.join(' · '), pick.service].filter(Boolean).join(' · ');
+    }
+    return pick;
+  }
+
   function catalog(kind) {
     var key = kind || 'explore';
     if (catalogs[key]) return catalogs[key];
     var list = Watchlist.select(snapshot ? snapshot.picks : [], kind, function (service) {
       return (CONFIG.watchlistServices || []).indexOf(service) >= 0 && !!appFor(service);
-    }, sessionSeed, null);
+    }, sessionSeed, null).map(withTvCounts);
     var previous = previousFeatured[key] || [], chosen = [], selected = {};
     var retained = sessionFeatured[key] || [];
     for (var retainedIndex = 0; retainedIndex < retained.length; retainedIndex++) {
@@ -219,7 +240,7 @@ var Data = (function () {
     if (!browseCatalogs[key]) {
       browseCatalogs[key] = Watchlist.browse(snapshot ? snapshot.picks : [], kind, function (service) {
         return (CONFIG.watchlistServices || []).indexOf(service) >= 0 && !!appFor(service);
-      }, sessionSeed);
+      }, sessionSeed).map(withTvCounts);
     }
     return browseCatalogs[key];
   }

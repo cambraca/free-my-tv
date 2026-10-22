@@ -222,6 +222,12 @@ These two selection policies are deliberately different. Do not share one orderi
   on the smaller featured/grid cards. Preserve TV-distance readability, wrapping/clamping, and dark-mode contrast.
 - Movie lengths use hours/minutes, such as **1h 28m**, not **88 min**. Normalize old cached metadata as well as
   newly fetched metadata.
+- Keep show metadata compact: show **3 seasons** when there is more than one season, or **8 episodes** for a
+  single-season show. Never display both counts. Localize singular/plural forms. Read `number_of_seasons` and
+  `number_of_episodes` from the existing TMDB show-details
+  response; do not fetch individual seasons or episodes. These are series totals, not counts available on a
+  particular service or Plex server. Hide missing/zero counts. Old cached titles gain counts on the next normal
+  metadata refresh or **Settings → Refresh IMDb and Plex**, preserving immediate startup and existing caches.
 
 ### Settings
 

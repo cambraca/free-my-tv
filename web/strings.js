@@ -76,6 +76,8 @@ var I18N = (function () {
     if (m) return 'vor ' + m[1] + (m[2] === 'min' ? ' Min.' : ' Std.');
     m = /^(\d+) seasons?$/.exec(en);
     if (m) return m[1] + (m[1] === '1' ? ' Staffel' : ' Staffeln');
+    m = /^(\d+) episodes?$/.exec(en);
+    if (m) return m[1] + (m[1] === '1' ? ' Folge' : ' Folgen');
     m = /^H:(\S+)(\s+)L:(\S+)$/.exec(en);
     if (m) return 'H:' + m[1] + m[2] + 'T:' + m[3];
     m = /^The shelf holds up to (\d+) apps\.$/.exec(en);
@@ -155,6 +157,10 @@ var I18N = (function () {
 
   function russianText(en) {
     if (Object.prototype.hasOwnProperty.call(russian, en)) return russian[en];
+    var count = /^(\d+) (seasons?|episodes?)$/.exec(en);
+    if (count) return count[2].indexOf('season') === 0
+      ? I18N.count(Number(count[1]), 'сезон', 'сезона', 'сезонов')
+      : I18N.count(Number(count[1]), 'эпизод', 'эпизода', 'эпизодов');
     var search = /^Search for “(.+)” in (.+)\.$/.exec(en);
     if (search) return 'Найдите «' + search[1] + '» в ' + search[2] + '.';
     var m = /^(\d+) (min|h) ago$/.exec(en);
