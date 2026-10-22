@@ -283,6 +283,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night #clock { color: #F5F5F7; }
 .night #clock .date { color: rgba(245, 245, 247, 0.62); }
 
+#watchlist-status { position: absolute; top: 822px; left: 80px; right: 80px; text-align: center; font-size: 23px; color: #6E6E73; }
+.night #watchlist-status { color: rgba(245, 245, 247, 0.62); }
+
 /* MARK: - Shelf: the glass bar with the apps, each in its brand color; focused, a tile grows 20% and rises. */
 
 #platter {

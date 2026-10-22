@@ -7,6 +7,11 @@ var I18N = (function () {
 
   var lang = 'en';
   var german = {
+    "No titles available.": "Keine Titel verfügbar.",
+    "Set your IMDb user ID in config.properties.": "Trage deine IMDb-Benutzer-ID in config.properties ein.",
+    "Updating your watchlist…": "Deine Merkliste wird aktualisiert…",
+    "Your watchlist is not available yet.": "Deine Merkliste ist noch nicht verfügbar.",
+    "No watchlist titles available on your services in this tab.": "In diesem Tab sind keine Titel deiner Merkliste bei deinen Diensten verfügbar.",
     "Live TV": "Live-TV",
     "All Apps": "Alle Apps",
     "Settings": "Einstellungen",
@@ -71,6 +76,11 @@ var I18N = (function () {
   }
 
   var russian = {
+    "No titles available.": "Нет доступных фильмов и сериалов.",
+    "Set your IMDb user ID in config.properties.": "Укажите ID пользователя IMDb в config.properties.",
+    "Updating your watchlist…": "Обновление вашего списка…",
+    "Your watchlist is not available yet.": "Ваш список пока недоступен.",
+    "No watchlist titles available on your services in this tab.": "В этой вкладке нет доступных на ваших сервисах фильмов и сериалов из списка.",
     "Live TV": "Телеканалы",
     "All Apps": "Приложения",
     "Settings": "Настройки",

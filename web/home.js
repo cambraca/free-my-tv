@@ -225,6 +225,17 @@
     }
   }
 
+  function renderWatchlistStatus() {
+    var status = Data.watchlistStatus();
+    var message = !status.configured ? tr('Configure seu usuário do IMDb em config.properties.',
+        'Set your IMDb user ID in config.properties.', 'Configura tu usuario de IMDb en config.properties.')
+        : status.error ? status.error : status.refreshing ? tr('Atualizando sua lista…', 'Updating your watchlist…', 'Actualizando tu lista…')
+        : !status.loaded ? tr('Sua lista ainda não está disponível.', 'Your watchlist is not available yet.', 'Tu lista aún no está disponible.')
+        : !Data.picks(TAB_KIND[st.tab]).length ? tr('Nenhum título da sua lista disponível nestes serviços.',
+            'No watchlist titles available on your services in this tab.', 'No hay títulos de tu lista disponibles en estos servicios.') : '';
+    $('watchlist-status').textContent = message;
+  }
+
   // MARK: - Picks and background
 
   function renderCards() {
@@ -232,7 +243,9 @@
     var holder = $('cards');
     setClass(body, 'no-picks', !list.length);
     var same = list.length === cards.length;
-    for (var i = 0; same && i < list.length; i++) same = list[i].id === cards[i].id && list[i].backdrop === cards[i].backdrop && list[i].meta === cards[i].meta;
+    for (var i = 0; same && i < list.length; i++) same = list[i].id === cards[i].id && list[i].backdrop === cards[i].backdrop
+        && list[i].meta === cards[i].meta && list[i].title === cards[i].title && list[i].app === cards[i].app
+        && list[i].url === cards[i].url;
     if (same && holder.children.length === list.length) return;
     cards = list;
     holder.innerHTML = '';
@@ -806,6 +819,7 @@
 
   function renderAll() {
     renderTop();
+    renderWatchlistStatus();
     cards = [];
     renderCards();
     renderShelf();
@@ -839,6 +853,7 @@
   }
 
   Data.onChange(function () {
+    renderWatchlistStatus();
     renderCards();
     renderPanels();
     checkNight();

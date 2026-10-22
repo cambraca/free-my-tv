@@ -1,11 +1,4 @@
-/*
- * What the home screen shows, kept in localStorage so it opens with numbers:
- *  - the picks: what's trending this week and recent releases, only from the streaming apps on this TV (TMDB, with
- *    the person's own free key from config.properties), three per hour;
- *  - weather, sunrise and sunset (Open-Meteo, every 30 min) and optional crypto prices (Binance, every 5 min).
- * Settings changed on the TV (Prefs) win over config.properties, as on Android. Built without a city (--generic), the
- * TV's time zone gives the city, and its country the currency and the region (zones.js).
- */
+/* Weather and IMDb watchlist picks, cached locally for immediate startup. */
 var CONFIG = window.CONFIG || {};
 
 var Place = (function () {
@@ -128,23 +121,20 @@ var Data = (function () {
     });
   }
 
-  // MARK: - Picks (TMDB)
+  // MARK: - Watchlist
 
-  var KEY = (CONFIG.tmdbKey || '').trim();
-  var REGION = Place.country;
-  var API = 'https://api.themoviedb.org/3';
-
-  /** Service name on TMDB (part of it, lowercase) → our key, how to find its app on the TV (id, name), its name. */
   var SERVICES = [
     ['netflix', 'netflix', /^netflix$/, /netflix/i, 'Netflix'],
-    ['prime video', 'prime', /^amazon$/, /prime video|amazon/i, 'Prime Video'],
-    ['disney', 'disney', /disney/, /disney/i, 'Disney+'],
-    ['hulu', 'hulu', /^hulu/, /hulu/i, 'Hulu'],
-    ['paramount', 'paramount', /paramount|cbs/, /paramount/i, 'Paramount+'],
-    ['peacock', 'peacock', /peacock/, /peacock/i, 'Peacock'],
-    ['globoplay', 'globoplay', /globoplay/, /globoplay/i, 'Globoplay'],
-    ['max', 'max', /hbo|wbd|\.max/, /^(hbo )?max$|hbo max/i, 'Max'],
-    ['apple tv', 'appletv', /appletv|apple\.tv/, /apple tv/i, 'Apple TV']
+    ['mubi', 'mubi', /^com\.mubi$|^mubi$/, /mubi/i, 'MUBI'],
+    ['plex', 'plex', /^cdp-30$|plex/, /plex/i, 'Plex']
+    // ['max', 'max', /hbo|wbd|\.max/, /^(hbo )?max$|hbo max/i, 'HBO Max'],
+    // ['prime video', 'prime', /^amazon$/, /prime video|amazon/i, 'Prime Video'],
+    // ['disney', 'disney', /disney/, /disney/i, 'Disney+'],
+    // ['hulu', 'hulu', /^hulu/, /hulu/i, 'Hulu'],
+    // ['paramount', 'paramount', /paramount|cbs/, /paramount/i, 'Paramount+'],
+    // ['peacock', 'peacock', /peacock/, /peacock/i, 'Peacock'],
+    // ['globoplay', 'globoplay', /globoplay/, /globoplay/i, 'Globoplay'],
+    // ['apple tv', 'appletv', /appletv|apple\.tv/, /apple tv/i, 'Apple TV']
   ];
 
   var installed = [];   // the TV's apps, from TV.apps()
@@ -160,242 +150,59 @@ var Data = (function () {
     return null;
   }
 
-  function service(providerName) {
-    var n = (providerName || '').toLowerCase();
-    for (var i = 0; i < SERVICES.length; i++) {
-      var s = SERVICES[i];
-      if (s[0] === 'max' ? /\bmax\b/.test(n) : n.indexOf(s[0]) >= 0) return s;
+  var snapshot = stored('watchlist');
+  var seed = window.WATCHLIST_SEED;
+  if (!Watchlist.valid(snapshot, CONFIG)) snapshot = null;
+  if (Watchlist.valid(seed, CONFIG) && (!snapshot || seed.updatedAt > snapshot.updatedAt)) snapshot = seed;
+  var fetchingRecs = false, pollingRecs = false, pollTimer = 0, recsError = '';
+  var sessionSeed = String(Math.floor(Date.now() / 3600000)), catalogs = {};
+
+  function catalog(kind) {
+    var key = kind || 'explore';
+    if (!catalogs[key]) {
+      catalogs[key] = Watchlist.select(snapshot ? snapshot.picks : [], kind, function (service) {
+        return (CONFIG.watchlistServices || []).indexOf(service) >= 0 && !!appFor(service);
+      }, sessionSeed, null);
     }
-    return null;
+    return catalogs[key];
   }
 
-  function tmdb(path, done) {
-    var bearer = KEY.indexOf('eyJ') === 0;   // read access token (v4) or API key (v3)
-    var url = API + path + (bearer ? '' : (path.indexOf('?') >= 0 ? '&' : '?') + 'api_key=' + encodeURIComponent(KEY));
-    get(url, bearer ? {Authorization: 'Bearer ' + KEY, Accept: 'application/json'} : {Accept: 'application/json'}, done);
-  }
-
-  var cache = stored('recs') || {};
-  var picks = cache.picks || [], listAt = cache.listAt || 0, period = cache.period, listLang = cache.lang || '', stamp = cache.stamp || '';
-  var fetchingRecs = false, failedAt = 0, recsError = '';
-
-  function saveRecs() { store('recs', {picks: picks, listAt: listAt, period: period, lang: listLang, stamp: stamp}); }
-
-  function hourPeriod(d) {
-    var h = d.getHours();
-    return h >= 5 && h < 12 ? 0 : h >= 12 && h < 18 ? 1 : 2;
-  }
-
-  function sourceStamp() {
-    var s = KEY.length + ':' + KEY.slice(-6) + ':' + REGION;
-    for (var i = 0; i < SERVICES.length; i++) s += appFor(SERVICES[i][1]) ? '1' : '0';
-    return s;
-  }
-
-  function franchise(title) {
-    var t = (title || '').toLowerCase(), cut = t.indexOf(':');
-    if (cut < 0) cut = t.indexOf(' - ');
-    return (cut > 0 ? t.slice(0, cut) : t).replace(/^\s+|\s+$/g, '');
-  }
-
-  /** This hour's 3 picks: movies ("movie"), shows ("tv") or both (null). */
   function now(kind) {
-    var list = [];
-    if (!KEY) return list;
-    for (var i = 0; i < picks.length; i++) {
-      var p = picks[i];
-      if ((kind === null || kind === p.kind) && (!p.detailed || (p.app && appFor(p.app)))) list.push(p);
-    }
-    if (!list.length) return list;
-    var hour = Math.floor(Date.now() / 3600000), out = [], seen = {};
-    for (var j = 0; j < list.length && out.length < 3; j++) {
-      var q = list[(hour * 3 + j) % list.length], f = franchise(q.title);
-      if (!seen[f]) { seen[f] = true; out.push(q); }
-    }
-    return out;
+    return catalog(kind).slice(0, 3);
   }
 
-  function lang() { return I18N.locale(); }
-
-  function day(offset) {
-    var d = new Date(Date.now() + offset * 86400000);
-    function two(n) { return (n < 10 ? '0' : '') + n; }
-    return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate());
-  }
-
-  var GENRES = {
-    ru: {"Action & Adventure": "Боевик и приключения", "Sci-Fi & Fantasy": "Фантастика и фэнтези", "War & Politics": "Война и политика", "Kids": "Для детей", "News": "Новости", "Soap": "Мыльная опера", "Talk": "Ток-шоу"},
-    pt: {'Action & Adventure': 'Ação e Aventura', 'Sci-Fi & Fantasy': 'Ficção Científica e Fantasia', 'War & Politics': 'Guerra e Política',
-      'Kids': 'Infantil', 'News': 'Notícias', 'Soap': 'Novela', 'Talk': 'Entrevistas'},
-    es: {'Action & Adventure': 'Acción y Aventura', 'Sci-Fi & Fantasy': 'Ciencia ficción y Fantasía', 'War & Politics': 'Guerra y Política',
-      'Kids': 'Infantil', 'News': 'Noticias', 'Soap': 'Telenovela', 'Talk': 'Entrevistas'},
-    de: {'Action & Adventure': 'Action & Abenteuer', 'War & Politics': 'Krieg & Politik', 'Kids': 'Kinder', 'News': 'Nachrichten',
-      'Soap': 'Seifenoper', 'Talk': 'Talkshow'}
-  };
-
-  /** The best backdrop: no text over it, the largest, then the best rated. */
-  function bestBackdrop(images) {
-    var list = images && images.backdrops, best = null, score = -1;
-    for (var i = 0; list && i < list.length; i++) {
-      var b = list[i];
-      if (!b.file_path) continue;
-      var s = (b.iso_639_1 === null ? 1e7 : 0) + Math.min(b.width || 0, 3840) * 100 + (b.vote_average || 0);
-      if (s > score) { score = s; best = b.file_path; }
-    }
-    return best;
-  }
-
-  /** Genre, runtime or seasons, and the service it's on among the TV's apps. */
-  function details(p, done) {
-    tmdb('/' + p.kind + '/' + p.id + '?language=' + lang() + '&append_to_response=watch/providers,images&include_image_language=null,'
-        + I18N.lang + ',en', function (err, o) {
-      if (err) { done(err); return; }
-      var best = bestBackdrop(o.images);
-      if (best) p.backdrop = best;
-      var parts = [];
-      if (p.kind === 'tv') parts.push(tr('Série', 'Series', 'Serie'));
-      if (o.genres && o.genres.length) {
-        var g = o.genres[0].name, table = GENRES[I18N.lang];
-        parts.push(table && table[g] ? table[g] : g);
-      }
-      if (p.kind === 'movie' && o.runtime > 0) {
-        var h = Math.floor(o.runtime / 60), m = o.runtime % 60;
-        parts.push(I18N.lang === 'ru' ? (h ? h + ' ч ' + m + ' мин' : m + ' мин') : I18N.lang === 'en' ? (h ? h + 'h ' + m + 'm' : m + 'm') : (h ? h + ' h ' + m + ' min' : m + ' min'));
-      } else if (p.kind === 'tv' && o.number_of_seasons > 0) {
-        var n = o.number_of_seasons;
-        parts.push(I18N.lang === 'ru' ? I18N.count(n, 'сезон', 'сезона', 'сезонов') : tr(n === 1 ? '1 temporada' : n + ' temporadas', n === 1 ? '1 season' : n + ' seasons', n === 1 ? '1 temporada' : n + ' temporadas'));
-      }
-      var wp = o['watch/providers'], here = wp && wp.results && wp.results[REGION], flat = here && here.flatrate;
-      p.app = null;
-      for (var i = 0; flat && i < flat.length && !p.app; i++) {
-        var s = service(flat[i].provider_name);
-        if (s && appFor(s[1])) { p.app = s[1]; p.service = s[4]; }
-      }
-      if (p.service && p.app) parts.push(p.service);
-      p.meta = parts.join(' · ');
-      title(p, o, function () {
-        p.detailed = true;
-        done(null);
-      });
-    });
-  }
-
-  /**
-   * Without a title in the TV's language TMDB answers with the original one, so a Korean series on a German TV reads
-   * "닥터X: 하얀 마피아의 시대". Then the English title, when TMDB has one (one more request, only for those).
-   */
-  function title(p, o, done) {
-    var field = p.kind === 'movie' ? 'title' : 'name', own = o[field] || p.title;
-    p.title = own;
-    if (I18N.lang === 'en' || !own || own !== o['original_' + field] || o.original_language === I18N.lang
-        || o.original_language === 'en') { done(); return; }
-    tmdb('/' + p.kind + '/' + p.id + '?language=en-US', function (err, en) {
-      if (!err && en && en[field]) p.title = en[field];
-      done();
-    });
-  }
-
-  function addPick(list, o, kind) {
-    if (!o.backdrop_path) return;
-    list.push({id: o.id, kind: kind, title: kind === 'movie' ? o.title : o.name, backdrop: o.backdrop_path, meta: '', app: null, detailed: false});
-  }
-
-  function keyOf(p) { return p.kind + ':' + p.id; }
-
-  function alternate(out, seen, a, b, max) {
-    for (var i = 0; i < Math.max(a.length, b.length) && out.length < max; i++) {
-      if (i < a.length && !seen[keyOf(a[i])]) { seen[keyOf(a[i])] = true; out.push(a[i]); }
-      if (i < b.length && out.length < max && !seen[keyOf(b[i])]) { seen[keyOf(b[i])] = true; out.push(b[i]); }
-    }
-  }
-
-  /** Runs fn on each item one after the other (the TV's network is shared with what's playing). */
-  function each(items, fn, done) {
-    var i = 0;
-    (function next() {
-      if (i >= items.length) { done(); return; }
-      fn(items[i++], next);
-    })();
-  }
-
-  function fetchList(done) {
-    tmdb('/watch/providers/movie?language=' + lang() + '&watch_region=' + REGION, function (err, res) {
-      if (err) { done(err); return; }
-      var ids = [];
-      for (var i = 0; res.results && i < res.results.length; i++) {
-        var s = service(res.results[i].provider_name);
-        if (s && appFor(s[1])) ids.push(res.results[i].provider_id);
-      }
-      if (!ids.length) { done(new Error("none of the TV's streaming apps are on TMDB")); return; }
-      var common = '&language=' + lang() + '&watch_region=' + REGION + '&with_watch_monetization_types=flatrate&include_adult=false'
-          + '&sort_by=popularity.desc&with_watch_providers=' + encodeURIComponent(ids.join('|'));
-      var hot = {movie: [], tv: []}, fresh = {movie: [], tv: []};
-      each(['movie', 'tv'], function (kind, next) {
-        tmdb('/trending/' + kind + '/week?language=' + lang(), function (e, r) {
-          var candidates = [];
-          for (var j = 0; !e && j < r.results.length && j < 16; j++) addPick(candidates, r.results[j], kind);
-          // Trending is only kept when it's on one of the TV's apps: the details say where.
-          each(candidates, function (p, n) {
-            details(p, function (de) { if (!de && p.app) hot[kind].push(p); n(); });
-          }, next);
-        });
-      }, function () {
-        tmdb('/discover/movie?vote_count.gte=30&primary_release_date.gte=' + day(-365) + '&primary_release_date.lte=' + day(0) + common, function (e1, r1) {
-          for (var j = 0; !e1 && j < r1.results.length; j++) addPick(fresh.movie, r1.results[j], 'movie');
-          tmdb('/discover/tv?vote_count.gte=20&air_date.gte=' + day(-90) + '&air_date.lte=' + day(0) + common, function (e2, r2) {
-            for (var k = 0; !e2 && k < r2.results.length; k++) addPick(fresh.tv, r2.results[k], 'tv');
-            var list = [], seen = {};
-            alternate(list, seen, hot.movie, hot.tv, 24);
-            alternate(list, seen, fresh.movie, fresh.tv, 24);
-            if (!list.length) { done(new Error('TMDB returned no recommendations')); return; }
-            picks = list;
-            done(null);
-          });
-        });
-      });
-    });
-  }
-
-  /** Fetches the list when stale (6 h, a new period of the day, language, key or apps), then this hour's details. */
   function refreshRecs() {
-    if (!KEY || fetchingRecs || !installed.length) return;
-    var t = Date.now(), p = hourPeriod(new Date()), st = sourceStamp();
-    if (st === stamp && failedAt && t - failedAt < 10 * 60000 && t >= failedAt) return;
-    var stale = st !== stamp || p !== period || t - listAt > 6 * 3600000 || t < listAt || !picks.length || listLang !== I18N.lang;
-    var wanted = all(), missing = false;
-    for (var i = 0; i < wanted.length; i++) missing = missing || !wanted[i].detailed;
-    if (!stale && !missing) return;
+    if (fetchingRecs || !CONFIG.imdbUserId || (!TV.isWebOS && !TV.isPreview)) return;
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = 0; }
     fetchingRecs = true;
-    stamp = st;
-    function finish(err) {
+    TV.watchlist(function (result) {
       fetchingRecs = false;
-      if (err) { recsError = err.message; failedAt = Date.now(); } else { recsError = ''; failedAt = 0; }
-      saveRecs();
+      if (!result) {
+        pollingRecs = false;
+        recsError = TV.isPreview ? 'Preview server is unavailable. Restart node tools/preview.js.'
+            : 'Watchlist service is unavailable. Reinstall the updated webOS package.';
+        changed();
+        return;
+      }
+      if (Watchlist.valid(result.snapshot, CONFIG)) {
+        snapshot = result.snapshot;
+        catalogs = {};
+        store('watchlist', snapshot);
+      }
+      recsError = result.error || snapshot && snapshot.warnings.join(' ') || '';
+      pollingRecs = result.refreshing;
       changed();
-    }
-    function detailWanted() {
-      var todo = all().filter(function (x) { return !x.detailed; });
-      each(todo, function (x, next) { details(x, function () { next(); }); }, function () { finish(null); });
-    }
-    if (stale) {
-      fetchList(function (err) {
-        if (err) { finish(err); return; }
-        listAt = Date.now();
-        period = p;
-        listLang = I18N.lang;
-        detailWanted();
-      });
-    } else {
-      detailWanted();
-    }
+      if (pollingRecs) pollTimer = setTimeout(function () { refreshRecs(); }, 5000);
+    });
   }
 
-  /** This hour's picks for the three tabs, without repeats (the screensaver shows them too). */
   function all() {
     var out = [], seen = {}, kinds = [null, 'movie', 'tv'];
-    for (var k = 0; k < kinds.length; k++) {
-      var list = now(kinds[k]);
-      for (var i = 0; i < list.length; i++) if (!seen[keyOf(list[i])]) { seen[keyOf(list[i])] = true; out.push(list[i]); }
+    for (var kindIndex = 0; kindIndex < kinds.length; kindIndex++) {
+      var list = now(kinds[kindIndex]);
+      for (var index = 0; index < list.length; index++) {
+        if (!seen[list[index].id]) { seen[list[index].id] = true; out.push(list[index]); }
+      }
     }
     return out;
   }
@@ -405,17 +212,22 @@ var Data = (function () {
   return {
     city: Place.city,
     onChange: function (fn) { listeners.push(fn); },
-    setApps: function (apps) { installed = apps; },
+    setApps: function (apps) { installed = apps; catalogs = {}; },
     appFor: appFor,
     refresh: function () { refreshWeather(); refreshRecs(); },
     settingsChanged: changed,
     get weather() { return weather; },
     get weatherAt() { return weatherAt; },
-    hasKey: function () { return !!KEY; },
+    watchlistStatus: function () {
+      return {configured: !!CONFIG.imdbUserId, refreshing: fetchingRecs || pollingRecs,
+        total: snapshot ? snapshot.entries.length : 0, available: snapshot ? snapshot.picks.length : 0,
+        loaded: !!snapshot, error: recsError || snapshot && snapshot.warnings.join(' ') || ''};
+    },
     recsError: function () { return recsError; },
     picks: now,
+    catalog: catalog,
     showcase: all,
-    image: function (path, size) { return path ? 'https://image.tmdb.org/t/p/' + (size || 'w1280') + path : ''; },
+    image: function (path, size) { return !path ? '' : /^https?:/.test(path) ? path : 'https://image.tmdb.org/t/p/' + (size || 'w1280') + path; },
 
     /** Night at the location: from sunset to sunrise (the last forecast; without one, 6:00 and 18:00). */
     isNight: function (at) {
