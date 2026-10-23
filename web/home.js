@@ -207,7 +207,7 @@
 
   // MARK: - Top: title, tabs, buttons, quotes
 
-  var TAB_KIND = [null, 'movie', 'tv', 'unavailable'];
+  var TAB_KIND = [null, 'movie', 'tv', 'unavailable', 'watched'];
 
   function renderTop() {
     $('title').textContent = 'TV';
@@ -215,7 +215,7 @@
     var tabs = $('tabs');
     tabs.innerHTML = '';
     var names = [tr('Explorar', 'Explore', 'Explorar'), tr('Filmes', 'Movies', 'Películas'), tr('Séries', 'Shows', 'Series'),
-      tr('Indisponíveis', 'Unavailable', 'No disponibles')];
+      tr('Indisponíveis', 'Unavailable', 'No disponibles'), tr('Assistidos', 'Watched', 'Vistos')];
     for (var i = 0; i < TAB_KIND.length; i++) {
       var t = el('button', 'tab', tabs, names[i]);
       hover(t, Z.TOP, i);
@@ -244,6 +244,8 @@
         : !status.loaded ? tr('Sua lista ainda não está disponível.', 'Your watchlist is not available yet.', 'Tu lista aún no está disponible.')
         : !Data.picks(TAB_KIND[st.tab]).length && TAB_KIND[st.tab] === 'unavailable'
           ? tr('Nenhum título indisponível.', 'No unavailable titles.', 'No hay títulos no disponibles.')
+        : !Data.picks(TAB_KIND[st.tab]).length && TAB_KIND[st.tab] === 'watched'
+          ? tr('Nenhum título assistido.', 'No watched titles.', 'No hay títulos vistos.')
         : !Data.picks(TAB_KIND[st.tab]).length ? tr('Nenhum título da sua lista disponível nestes serviços.',
             'No watchlist titles available on your services in this tab.', 'No hay títulos de tu lista disponibles en estos servicios.') : '';
     $('watchlist-status').textContent = message;
@@ -654,7 +656,7 @@
       case Z.CARDS:
         var p = cards[st.card], app = p && Data.appFor(p.app);
         if (app) launcher(app.id, app.title, p)();
-        else if (p && TAB_KIND[st.tab] === 'unavailable') openDetails(p);
+        else if (p) openDetails(p);
         return;
       case Z.SHELF:
         if (shelf[st.shelf]) launcher(shelf[st.shelf].id, shelf[st.shelf].title)();
@@ -662,7 +664,7 @@
       case Z.DRAWER:
         var item = browsePicks[st.drawer], service = item && Data.appFor(item.app);
         if (service) launcher(service.id, service.title, item)();
-        else if (item && TAB_KIND[st.tab] === 'unavailable') openDetails(item);
+        else if (item) openDetails(item);
         return;
       case Z.APPS:
         if (others[st.grid]) launcher(others[st.grid].id, others[st.grid].title)();
@@ -695,6 +697,14 @@
   function focusDetailActions() {
     var buttons = $('details').querySelectorAll('.detail-action');
     for (var index = 0; index < buttons.length; index++) setClass(buttons[index], 'focus', index === detailAction);
+    var focused = buttons[detailAction];
+    if (focused) {
+      var row = focused.parentNode;
+      if (focused.offsetLeft < row.scrollLeft) row.scrollLeft = focused.offsetLeft;
+      else if (focused.offsetLeft + focused.offsetWidth > row.scrollLeft + row.clientWidth) {
+        row.scrollLeft = focused.offsetLeft + focused.offsetWidth - row.clientWidth;
+      }
+    }
   }
 
   function activateDetailAction() {
@@ -703,6 +713,8 @@
     if (action.option) {
       launcher(action.app.id, action.app.title, {id: detailPick.id, imdbId: detailPick.imdbId,
         title: detailPick.title, app: action.option.app, url: action.option.url})();
+    } else if (action.watched) {
+      Data.markWatched(detailPick);
     } else playTrailer();
   }
 
@@ -748,6 +760,8 @@
     });
     if (pick.trailer && Data.appFor('youtube')) detailButton(actions,
       '▶ ' + tr('Ver trailer', 'Watch trailer', 'Ver tráiler'), {trailer: true});
+    if (!Data.isWatched(pick)) detailButton(actions,
+      tr('Marcar como assistido', 'Mark as watched', 'Marcar como visto'), {watched: true});
     detailAction = Math.max(0, Math.min(detailAction, detailActions.length - 1));
     focusDetailActions();
     var content = el('div', 'detail-content', page);
@@ -799,7 +813,7 @@
   function closeDetails() {
     detailRequest++;
     setClass($('details'), 'open', false);
-    st.zone = detailReturn;
+    st.zone = detailReturn === Z.CARDS && !cards.length ? Z.SHELF : detailReturn;
     updateFocus();
   }
 
@@ -1148,6 +1162,7 @@
     if (kind === 'watchlist' || kind === 'settings') {
       renderCards();
       renderDrawer();
+      if (st.zone === Z.DETAILS && detailPick) renderDetails(detailPick, false);
     }
     if (kind === 'weather' || kind === 'settings') renderPanels();
     if (st.zone === Z.SETTINGS) renderSettings();

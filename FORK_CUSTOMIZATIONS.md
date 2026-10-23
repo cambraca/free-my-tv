@@ -60,10 +60,20 @@ Key files: `web/tv.js`, `web/home.js`.
 ### Configuration and recommendation source
 
 Explore, Movies, and Shows in the web UI must come exclusively from the configured public IMDb watchlist, filtered
-to titles available on the user's configured services. A fourth tab, **Unavailable**, contains watchlist movies and
+to unwatched titles available on the user's configured services. A fourth tab, **Unavailable**, contains unwatched watchlist movies and
 shows with no Netflix, MUBI, or Plex match, regardless of which apps are installed. Do not fall back to trending titles, general recommendations,
 or arbitrary Plex content when the watchlist is empty, unavailable, or still loading. Show an appropriate status
 or the last valid cached watchlist instead.
+
+The fifth tab, **Watched**, contains watched watchlist movies and shows, including unavailable titles and titles
+whose service apps are not installed. Plex movies are watched when `viewCount` is positive; shows are watched
+when every available episode has been watched (`viewedLeafCount >= leafCount`, with a positive episode count).
+Partially watched shows remain in the normal tabs. Preserve these flags in Plex library caches and client picks.
+Old nonempty Plex caches without `watchedVersion: 1` trigger a background scan while retaining complete data on failure.
+The detail popup's **Mark as watched** action stores a local IMDb-ID flag in `fmtv.watched`, scoped to the configured
+watchlist source. This flag survives snapshot refreshes and app restarts, without changing Plex or IMDb. Hide the
+action for already watched titles, and exclude watched titles from all other tabs and the slideshow. Watched uses
+weighted featured picks and a newest-addition-first grid, retaining the same navigation and rendering bounds.
 
 Configuration belongs in the ignored local `config.properties`; `config.example.properties` documents its shape:
 
@@ -175,7 +185,7 @@ These two selection policies are deliberately different. Do not share one orderi
   another session in the running app, consuming that transition once across visibility/relaunch events.
 - The grid uses `Watchlist.browse` / `Data.browse`; the featured cards use their separate weighted catalogue.
   Netflix is the preferred launch provider for an Explore-grid title, even though its position is unweighted.
-- Remember the selected Explore/Movies/Shows/Unavailable tab across app launches. Each tab also retains its grid position
+- Remember the selected Explore/Movies/Shows/Unavailable/Watched tab across app launches. Each tab also retains its grid position
   while switching tabs in a session; do not reset the tab to Explore when reopening the app.
 - Screensaver artwork comes from the available watchlist picks, not a restored upstream trending feed.
 
@@ -204,7 +214,7 @@ These two selection policies are deliberately different. Do not share one orderi
 
 ### Two pages and TV-friendly cards
 
-- The top/featured page contains the title, four tabs, three featured titles, and app shelf. A compact weather
+- The top/featured page contains the title, five tabs, three featured titles, and app shelf. A compact weather
   widget sits immediately left of Settings at the top-right.
 - All three featured cards show metadata. The large card includes genre; the two narrower cards omit genres,
   showing only year, runtime/show count, and service on a single line.
@@ -254,6 +264,8 @@ These two selection policies are deliberately different. Do not share one orderi
   followed by the trailer action when available. Left/Right select a button, OK opens that exact service/title,
   and Up/Down scroll the description. Preserve explicit service choices even when Netflix is the default provider.
   Keep actions visible while the description scrolls; no service buttons appear for Unavailable titles.
+  Append **Mark as watched** after the trailer when the title is unwatched. Scroll the action row horizontally
+  with its remote selection when all actions do not fit, keeping every button reachable.
   The portrait poster is 596×894 at (80, 100) on the 1920×1080 stage; its bottom aligns with the 76px-high
   action buttons at y=918. The description and actions begin at x=750, leaving a clear gap beside the poster.
 - Retain poster/synopsis/genres/rating/TMDB ID in cached picks. An older cache can fetch just the selected title's

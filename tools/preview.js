@@ -51,7 +51,8 @@ function load() {
 function refresh(force) {
   if (!config.imdbUserId || refreshing || (!force && Date.now() - attemptedAt < 600000)) return;
   if (!force && snapshot && Watchlist.fresh(snapshot.updatedAt) && Watchlist.notesReady(snapshot)
-      && Watchlist.plexLinksReady(snapshot) && Watchlist.availabilityReady(snapshot) && !snapshot.warnings.length) return;
+      && Watchlist.plexLinksReady(snapshot) && Watchlist.watchedReady(snapshot)
+      && Watchlist.availabilityReady(snapshot) && !snapshot.warnings.length) return;
   refreshing = true;
   attemptedAt = Date.now();
   const currentConfig = config, currentPath = snapshotPath;

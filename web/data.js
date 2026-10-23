@@ -38,7 +38,7 @@ var Prefs = (function () {
     temperature: function () { return pick('temperature', CONFIG.temperature || 'auto'); },
     theme: function () { return pick('theme', 'auto'); },
     weather: function () { return pick('weather', true); },
-    tab: function () { return Math.max(0, Math.min(3, Math.floor(Number(pick('tab', 0)) || 0))); },
+    tab: function () { return Math.max(0, Math.min(4, Math.floor(Number(pick('tab', 0)) || 0))); },
     shelf: function () { return pick('shelf', null); },
     set: function (name, value) { v[name] = value; save(); this.version++; }
   };
@@ -158,6 +158,38 @@ var Data = (function () {
   if (Watchlist.valid(seed, CONFIG) && (!snapshot || seed.updatedAt > snapshot.updatedAt)) snapshot = seed;
   seed = null;
   window.WATCHLIST_SEED = null;
+  var localWatched = stored('watched');
+  if (!localWatched || localWatched.source !== Watchlist.source(CONFIG) || !localWatched.ids) {
+    localWatched = {source: Watchlist.source(CONFIG), ids: {}};
+  }
+
+  function isWatched(pick) {
+    if (localWatched.ids[pick.imdbId || pick.id]) return true;
+    var picks = snapshot ? snapshot.picks : [];
+    for (var index = 0; index < picks.length; index++) {
+      if (picks[index].id === pick.id) return !!picks[index].watched;
+    }
+    return !!pick.watched;
+  }
+
+  function catalogPicks() {
+    return (snapshot ? snapshot.picks : []).map(function (pick) {
+      if (!localWatched.ids[pick.imdbId || pick.id] || pick.watched) return pick;
+      var result = {};
+      for (var name in pick) if (pick.hasOwnProperty(name)) result[name] = pick[name];
+      result.watched = true;
+      return result;
+    });
+  }
+
+  function markWatched(pick) {
+    if (!pick || isWatched(pick)) return;
+    localWatched.ids[pick.imdbId || pick.id] = true;
+    store('watched', localWatched);
+    catalogs = {};
+    browseCatalogs = {};
+    changed('watchlist');
+  }
   var fetchingRecs = false, pollingRecs = false, pollTimer = 0, recsError = '';
   var active = !document.hidden, nextRecsAt = 0, savedRecsAt = snapshot ? snapshot.updatedAt : 0;
   var sessionSeed = '', sessionAt = 0, catalogs = {}, browseCatalogs = {}, previousFeatured = {}, featured = {}, sessionFeatured = {};
@@ -201,7 +233,7 @@ var Data = (function () {
   function catalog(kind) {
     var key = kind || 'explore';
     if (catalogs[key]) return catalogs[key];
-    var list = Watchlist.select(snapshot ? snapshot.picks : [], kind, function (service) {
+    var list = Watchlist.select(catalogPicks(), kind, function (service) {
       return (CONFIG.watchlistServices || []).indexOf(service) >= 0 && !!appFor(service);
     }, sessionSeed, null).map(withTvCounts);
     var previous = previousFeatured[key] || [], chosen = [], selected = {};
@@ -239,7 +271,7 @@ var Data = (function () {
   function browse(kind) {
     var key = kind || 'explore';
     if (!browseCatalogs[key]) {
-      browseCatalogs[key] = Watchlist.browse(snapshot ? snapshot.picks : [], kind, function (service) {
+      browseCatalogs[key] = Watchlist.browse(catalogPicks(), kind, function (service) {
         return (CONFIG.watchlistServices || []).indexOf(service) >= 0 && !!appFor(service);
       }, sessionSeed).map(withTvCounts);
     }
@@ -356,6 +388,8 @@ var Data = (function () {
     recsError: function () { return recsError; },
     picks: now,
     details: details,
+    isWatched: isWatched,
+    markWatched: markWatched,
     catalog: catalog,
     browse: browse,
     showcase: all,

@@ -57,6 +57,11 @@
 
   function availabilityReady(snapshot) { return !!(snapshot && snapshot.catalogVersion === 1); }
 
+  function watchedReady(snapshot) {
+    var library = snapshot && snapshot.plex;
+    return !!(library && (library.watchedVersion === 1 || !Object.keys(library.items || {}).length));
+  }
+
   function duration(minutes) {
     var hours = Math.floor(minutes / 60), remainder = minutes % 60;
     return (hours ? hours + 'h ' : '') + remainder + 'm';
@@ -143,7 +148,7 @@
 
   function scanPlex(config, request, done) {
     if (!config.plexHost || (config.watchlistServices || []).indexOf('plex') < 0) {
-      done(null, {items: {}, at: Date.now(), linksVersion: 1}); return;
+      done(null, {items: {}, at: Date.now(), linksVersion: 1, watchedVersion: 1}); return;
     }
     function get(path, callback) {
       request('GET', plexBase(config) + path, config.plexToken
@@ -156,7 +161,7 @@
     }
     get('/', function (err, identity) {
       if (err) { done(err); return; }
-      var library = {items: {}, machine: identity.machineIdentifier, at: Date.now(), linksVersion: 1};
+      var library = {items: {}, machine: identity.machineIdentifier, at: Date.now(), linksVersion: 1, watchedVersion: 1};
       if (!library.machine) { done(new Error('Plex server identity is missing.')); return; }
       get('/library/sections', function (sectionError, container) {
         if (sectionError) { done(sectionError); return; }
@@ -185,7 +190,8 @@
                 if (!item.ratingKey || (item.type !== 'movie' && item.type !== 'show')) continue;
                 if (item.type === 'show' ? !(item.leafCount > 0) : !item.Media || !item.Media.length) continue;
                 var match = {ratingKey: String(item.ratingKey), title: item.title, kind: item.type === 'show' ? 'tv' : 'movie',
-                  art: item.art || item.thumb || '', year: item.year, machine: library.machine};
+                  art: item.art || item.thumb || '', year: item.year, machine: library.machine,
+                  watched: item.type === 'show' ? Number(item.viewedLeafCount) >= Number(item.leafCount) : Number(item.viewCount) > 0};
                 var guids = (item.Guid || []).slice();
                 if (item.guid) guids.push({id: item.guid});
                 for (var guidIndex = 0; guidIndex < guids.length; guidIndex++) {
@@ -349,7 +355,7 @@
         trailer: resolved && resolved.trailer,
         meta: formatMeta(resolved && resolved.meta || String(entry.year || '')), note: entry.note || '',
         seasons: resolved && resolved.seasons, episodes: resolved && resolved.episodes,
-        options: options, rank: entry.rank, addedAt: entry.addedAt});
+        watched: !!(local && local.watched), options: options, rank: entry.rank, addedAt: entry.addedAt});
     }
     return picks;
   }
@@ -358,7 +364,9 @@
     previous = valid(previous, config) ? previous : null;
     var warnings = [], entriesAt = 0, snapshotAt = previous ? previous.updatedAt : 0;
     function libraryData(callback) {
-      if (!force && previous && plexLinksReady(previous) && fresh(previous.plex.at)) { callback(null, previous.plex); return; }
+      if (!force && previous && plexLinksReady(previous) && watchedReady(previous) && fresh(previous.plex.at)) {
+        callback(null, previous.plex); return;
+      }
       scanPlex(config, request, callback);
     }
     function match(entries) {
@@ -441,7 +449,8 @@
     var ranked = [], preference = ['netflix', 'plex', 'mubi'];
     for (var index = 0; index < picks.length; index++) {
       var pick = picks[index];
-      if (kind && kind !== 'unavailable' && kind !== pick.kind) continue;
+      if (kind === 'watched' ? !pick.watched : pick.watched) continue;
+      if (kind && kind !== 'unavailable' && kind !== 'watched' && kind !== pick.kind) continue;
       var option = null;
       if (kind === 'unavailable') {
         if (pick.options.length) continue;
@@ -455,6 +464,7 @@
           }
         }
       }
+      if (!option && kind === 'watched') option = {app: '', service: '', url: ''};
       if (!option) continue;
       var hash = parseInt(fingerprint(pick.imdbId + ':' + seed + ':' + kind), 16);
       var uniform = (hash + 1) / 4294967297;
@@ -501,7 +511,7 @@
   }
 
   return {source: source, valid: valid, fresh: fresh, notesReady: notesReady, plexLinksReady: plexLinksReady,
-    availabilityReady: availabilityReady, clientSnapshot: clientSnapshot, trailer: trailer,
+    availabilityReady: availabilityReady, watchedReady: watchedReady, clientSnapshot: clientSnapshot, trailer: trailer,
     crawl: crawl, scanPlex: scanPlex, plexTarget: plexTarget, providerLinks: providerLinks,
     sync: sync, select: select, browse: browse};
 });
