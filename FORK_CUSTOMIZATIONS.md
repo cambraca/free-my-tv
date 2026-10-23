@@ -240,7 +240,12 @@ These two selection policies are deliberately different. Do not share one orderi
 - The LG remote's **red button** (403) opens the same details for a focused featured/grid title, including playable
   titles. From the slideshow, it stops the slideshow and opens the current title's details; Back returns to the
   underlying launcher page. Ignore held-red repeats. Red does nothing in menus or an already-open detail page.
-  Keep short-press OK's existing launch/trailer behavior; do not delay it to guess whether an OK hold is coming.
+  Holding OK for 700 ms on a featured/grid/slideshow title also opens details (best effort: firmware must deliver
+  keydown/keyup). Short OK launches on release instead of keydown on these title surfaces; menus and detail
+  buttons retain immediate OK activation. Consume repeats, including repeated keydowns without a repeat flag,
+  and the release after a long press so it cannot launch a detail action. Cancel pending holds on another key,
+  pointer press, blur, visibility changes, or launcher reset; never activate a different title if focus changes.
+  Preserve red/right-click as reliable alternatives when firmware intercepts long OK.
   Right-clicking a featured/grid card in the browser preview opens that card's details too; right-clicking the
   slideshow opens its current title. Suppress the browser context menu only on these title surfaces.
 - Detail pages show a fixed action row for each matching installed service, ordered Netflix → Plex → MUBI,

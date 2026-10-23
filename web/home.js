@@ -784,9 +784,13 @@
     });
   }
 
-  function openFocusedDetails() {
-    var focused = saverOn ? saverPick : st.zone === Z.CARDS ? cards[st.card]
+  function focusedTitle() {
+    return saverOn ? saverPick : st.zone === Z.CARDS ? cards[st.card]
       : st.zone === Z.DRAWER ? browsePicks[st.drawer] : null;
+  }
+
+  function openFocusedDetails() {
+    var focused = focusedTitle();
     idleAt = Date.now();
     if (saverOn) hideSaver();
     if (focused) openDetails(focused);
@@ -991,8 +995,36 @@
 
   // MARK: - Keys
 
+  var okHold = null;
+  function cancelOkHold() {
+    if (okHold) clearTimeout(okHold.timer);
+    okHold = null;
+  }
+  function sameOkTarget(hold) {
+    return hold.zone === st.zone && hold.saver === saverOn && hold.pick === focusedTitle();
+  }
+  function beginOkHold() {
+    if (okHold) return true;
+    var pick = focusedTitle();
+    if (!pick) return false;
+    idleAt = Date.now();
+    var hold = {pick: pick, zone: st.zone, saver: saverOn, opened: false, timer: 0};
+    okHold = hold;
+    hold.timer = setTimeout(function () {
+      if (okHold !== hold || !sameOkTarget(hold)) return;
+      hold.opened = true;
+      openFocusedDetails();
+    }, 700);
+    return true;
+  }
+
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
+    if (k !== TV.keys.ok) cancelOkHold();
+    if (k === TV.keys.ok && (okHold || (!e.repeat && beginOkHold()))) {
+      e.preventDefault();
+      return;
+    }
     if (e.repeat && (k === TV.keys.slideshow || k === TV.keys.ok || k === TV.keys.details)) { e.preventDefault(); return; }
     if (k === TV.keys.details) {
       openFocusedDetails();
@@ -1030,6 +1062,21 @@
     else return;
     e.preventDefault();
   });
+  document.addEventListener('keyup', function (event) {
+    if (event.keyCode !== TV.keys.ok || !okHold) return;
+    var hold = okHold, unchanged = sameOkTarget(hold);
+    cancelOkHold();
+    event.preventDefault();
+    if (hold.opened || !unchanged) return;
+    idleAt = Date.now();
+    if (hold.saver) {
+      var app = Data.appFor(hold.pick.app);
+      hideSaver();
+      if (app) launcher(app.id, app.title, hold.pick)();
+    } else activate();
+  });
+  window.addEventListener('blur', cancelOkHold);
+  document.addEventListener('mousedown', cancelOkHold);
   document.addEventListener('mousemove', function () { poke(); });
   $('saver').oncontextmenu = function (event) {
     if (!saverOn) return;
@@ -1082,6 +1129,7 @@
 
   /** Back to the home screen (the app was opened again): the shelf, everything closed, the first tab. */
   function reset() {
+    cancelOkHold();
     hideSaver();
     closeSheets();
     st.zone = Z.SHELF;
@@ -1126,6 +1174,7 @@
   window.addEventListener('appcontrol', reopened);        // Samsung: the same
   var wasHidden = document.hidden;
   document.addEventListener('visibilitychange', function () {
+    cancelOkHold();
     Data.setActive(!document.hidden);
     if (document.hidden) { wasHidden = true; hideSaver(); return; }
     if (!wasHidden) { Data.refresh(); return; }
