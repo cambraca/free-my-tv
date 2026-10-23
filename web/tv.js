@@ -8,6 +8,8 @@
 var TV = (function () {
   'use strict';
 
+  var KEY_RED = 403, KEY_GREEN = 404, KEY_YELLOW = 405, KEY_BLUE = 406;
+
   var webos = typeof window.PalmServiceBridge !== 'undefined';
   var samsung = !webos && typeof window.tizen !== 'undefined' && !!window.tizen.application;
   var calls = [];   // a bridge is collected if nothing holds it before its reply arrives
@@ -480,6 +482,8 @@ var TV = (function () {
     },
 
     /** Key codes: the arrows, OK and the TV's Back (LG 461, Samsung 10009). */
-    keys: {left: 37, up: 38, right: 39, down: 40, ok: 13, back: samsung ? 10009 : 461, slideshow: 406, details: 403}
+    keys: {left: 37, up: 38, right: 39, down: 40, ok: 13, back: samsung ? 10009 : 461,
+      red: KEY_RED, green: KEY_GREEN, yellow: KEY_YELLOW, blue: KEY_BLUE,
+      slideshow: KEY_BLUE, details: KEY_RED}
   };
 })();

@@ -246,6 +246,8 @@ These two selection policies are deliberately different. Do not share one orderi
   and the release after a long press so it cannot launch a detail action. Cancel pending holds on another key,
   pointer press, blur, visibility changes, or launcher reset; never activate a different title if focus changes.
   Preserve red/right-click as reliable alternatives when firmware intercepts long OK.
+  `web/tv.js` names all four color key constants and exposes `TV.keys.red` (403), `green` (404), `yellow` (405),
+  and `blue` (406); the `details` and `slideshow` aliases reuse red and blue respectively.
   Right-clicking a featured/grid card in the browser preview opens that card's details too; right-clicking the
   slideshow opens its current title. Suppress the browser context menu only on these title surfaces.
 - Detail pages show a fixed action row for each matching installed service, ordered Netflix → Plex → MUBI,
