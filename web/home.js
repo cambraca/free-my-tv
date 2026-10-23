@@ -674,7 +674,7 @@
         editShelf(0);
         return;
       case Z.DETAILS:
-        if (detailPick && detailPick.trailer && Data.appFor('youtube')) playTrailer();
+        activateDetailAction();
         return;
     }
   }
@@ -691,7 +691,31 @@
     renderDrawer();
   }
 
-  var detailReturn = Z.CARDS, detailRequest = 0, detailPick = null;
+  var detailReturn = Z.CARDS, detailRequest = 0, detailPick = null, detailActions = [], detailAction = 0;
+  function focusDetailActions() {
+    var buttons = $('details').querySelectorAll('.detail-action');
+    for (var index = 0; index < buttons.length; index++) setClass(buttons[index], 'focus', index === detailAction);
+  }
+
+  function activateDetailAction() {
+    var action = detailActions[detailAction];
+    if (!action || !detailPick) return;
+    if (action.option) {
+      launcher(action.app.id, action.app.title, {id: detailPick.id, imdbId: detailPick.imdbId,
+        title: detailPick.title, app: action.option.app, url: action.option.url})();
+    } else playTrailer();
+  }
+
+  function detailButton(parent, label, action) {
+    var index = detailActions.length, button = el('button', 'detail-action', parent, label);
+    detailActions.push(action);
+    button.onmouseover = function () {
+      if (st.zone !== Z.DETAILS || saverOn) return;
+      detailAction = index;
+      focusDetailActions();
+    };
+    button.onclick = function () { poke(); detailAction = index; focusDetailActions(); activateDetailAction(); };
+  }
   function playTrailer() {
     var app = Data.appFor('youtube');
     if (!app || !detailPick || !detailPick.trailer) return;
@@ -713,10 +737,19 @@
       image.onerror = function () { image.style.display = 'none'; };
       image.src = Data.image(pick.poster, 'w500');
     }
-    if (pick.trailer && Data.appFor('youtube')) {
-      var trailer = el('button', 'detail-trailer focus', page, '▶ ' + tr('Ver trailer', 'Watch trailer', 'Ver tráiler'));
-      trailer.onclick = function () { poke(); playTrailer(); };
-    }
+    detailActions = [];
+    var actions = el('div', 'detail-actions', page);
+    ['netflix', 'plex', 'mubi'].forEach(function (service) {
+      var app = Data.appFor(service);
+      if (!app) return;
+      (pick.options || []).forEach(function (option) {
+        if (option.app === service) detailButton(actions, option.service, {app: app, option: option});
+      });
+    });
+    if (pick.trailer && Data.appFor('youtube')) detailButton(actions,
+      '▶ ' + tr('Ver trailer', 'Watch trailer', 'Ver tráiler'), {trailer: true});
+    detailAction = Math.max(0, Math.min(detailAction, detailActions.length - 1));
+    focusDetailActions();
     var content = el('div', 'detail-content', page);
     content.id = 'detail-content';
     el('div', 'detail-badge', content, pick.kind === 'tv' ? tr('Série', 'TV show', 'Serie') : tr('Filme', 'Movie', 'Película'));
@@ -740,6 +773,7 @@
   function openDetails(pick) {
     detailReturn = st.zone;
     var request = ++detailRequest;
+    detailAction = 0;
     st.zone = Z.DETAILS;
     $('details').innerHTML = '';
     renderDetails(pick, !pick.detailsLoaded);
@@ -748,6 +782,14 @@
     Data.details(pick, function (error, detail) {
       if (st.zone === Z.DETAILS && request === detailRequest) renderDetails(detail || pick, false);
     });
+  }
+
+  function openFocusedDetails() {
+    var focused = saverOn ? saverPick : st.zone === Z.CARDS ? cards[st.card]
+      : st.zone === Z.DRAWER ? browsePicks[st.drawer] : null;
+    idleAt = Date.now();
+    if (saverOn) hideSaver();
+    if (focused) openDetails(focused);
   }
 
   function closeDetails() {
@@ -761,7 +803,10 @@
     var tiles = $('tiles').children, cardNodes = $('cards').children;
     switch (st.zone) {
       case Z.DETAILS:
-        $('detail-content').scrollTop += dy * 160;
+        if (dx) {
+          detailAction = Math.max(0, Math.min(detailActions.length - 1, detailAction + dx));
+          focusDetailActions();
+        } else $('detail-content').scrollTop += dy * 160;
         return;
       case Z.SHELF:
         if (dx) st.shelf = Math.max(0, Math.min(shelf.length - 1, st.shelf + dx));
@@ -841,6 +886,12 @@
       updateFocus();
     };
     node.onclick = function () { node.onmouseover(); activate(); };
+    if (zone === Z.CARDS || zone === Z.DRAWER) node.oncontextmenu = function (event) {
+      event.preventDefault();
+      if (sheetOpen() || saverOn) return;
+      node.onmouseover();
+      if (st.zone === zone) openFocusedDetails();
+    };
   }
 
   // MARK: - Toast
@@ -942,7 +993,12 @@
 
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
-    if (e.repeat && (k === TV.keys.slideshow || k === TV.keys.ok)) { e.preventDefault(); return; }
+    if (e.repeat && (k === TV.keys.slideshow || k === TV.keys.ok || k === TV.keys.details)) { e.preventDefault(); return; }
+    if (k === TV.keys.details) {
+      openFocusedDetails();
+      e.preventDefault();
+      return;
+    }
     if (saverOn && k === TV.keys.ok) {
       var pick = saverPick, app = pick && Data.appFor(pick.app);
       idleAt = Date.now();
@@ -975,6 +1031,11 @@
     e.preventDefault();
   });
   document.addEventListener('mousemove', function () { poke(); });
+  $('saver').oncontextmenu = function (event) {
+    if (!saverOn) return;
+    event.preventDefault();
+    openFocusedDetails();
+  };
   var wheelAt = 0;
   document.addEventListener('wheel', function (event) {
     if (sheetOpen() || !event.deltaY) return;

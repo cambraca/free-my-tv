@@ -438,7 +438,7 @@
   }
 
   function select(picks, kind, available, seed, limit) {
-    var ranked = [];
+    var ranked = [], preference = ['netflix', 'plex', 'mubi'];
     for (var index = 0; index < picks.length; index++) {
       var pick = picks[index];
       if (kind && kind !== 'unavailable' && kind !== pick.kind) continue;
@@ -447,8 +447,12 @@
         if (pick.options.length) continue;
         option = {app: '', service: '', url: ''};
       } else {
-        for (var optionIndex = 0; optionIndex < pick.options.length; optionIndex++) {
-          if (available(pick.options[optionIndex].app)) { option = pick.options[optionIndex]; break; }
+        for (var serviceIndex = 0; serviceIndex < preference.length && !option; serviceIndex++) {
+          for (var optionIndex = 0; optionIndex < pick.options.length; optionIndex++) {
+            if (pick.options[optionIndex].app === preference[serviceIndex] && available(preference[serviceIndex])) {
+              option = pick.options[optionIndex]; break;
+            }
+          }
         }
       }
       if (!option) continue;

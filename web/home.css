@@ -416,12 +416,13 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .sheet.open { opacity: 1; visibility: visible; -webkit-transform: none; transform: none; -webkit-transition-delay: 0s; transition-delay: 0s; }
 #details { background: -webkit-linear-gradient(115deg, #DCE5EF, #F7F8FA 58%); background: linear-gradient(115deg, #DCE5EF, #F7F8FA 58%); color: #202632; }
 .night #details { background: -webkit-linear-gradient(115deg, #10151F, #192231 70%); background: linear-gradient(115deg, #10151F, #192231 70%); color: #F5F5F7; }
-.detail-poster { position: absolute; left: 110px; top: 130px; width: 500px; height: 750px; border-radius: 24px; overflow: hidden; background: #2C394C; box-shadow: 0 30px 65px rgba(0, 0, 0, 0.3); }
+.detail-poster { position: absolute; left: 80px; top: 100px; width: 596px; height: 894px; border-radius: 24px; overflow: hidden; background: #2C394C; box-shadow: 0 30px 65px rgba(0, 0, 0, 0.3); }
 .detail-poster img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: contain; }
 .detail-poster-fallback { position: absolute; left: 38px; right: 38px; top: 38%; font-size: 40px; font-weight: 600; text-align: center; color: #FFF; }
-.detail-trailer { position: absolute; left: 110px; top: 918px; width: 500px; height: 76px; border: 2px solid #6B7F9A; border-radius: 16px; background: #243C5D; color: #FFF; font: inherit; font-size: 28px; font-weight: 600; cursor: pointer; }
-.detail-trailer.focus { box-shadow: 0 0 0 4px rgba(111, 151, 203, 0.25); }
-.detail-content { position: absolute; left: 690px; top: 130px; width: 1110px; height: 820px; overflow-y: auto; padding-right: 24px; box-sizing: border-box; }
+.detail-actions { position: absolute; left: 750px; top: 918px; right: 110px; white-space: nowrap; }
+.detail-action { display: inline-block; height: 76px; margin-right: 14px; padding: 0 24px; border: 2px solid rgba(107, 127, 154, 0.4); border-radius: 16px; background: rgba(107, 127, 154, 0.12); color: inherit; font: inherit; font-size: 28px; font-weight: 600; cursor: pointer; }
+.detail-action.focus { background: #243C5D; border-color: #6B7F9A; color: #FFF; box-shadow: 0 0 0 4px rgba(111, 151, 203, 0.25); }
+.detail-content { position: absolute; left: 750px; top: 100px; width: 1050px; height: 790px; overflow-y: auto; padding-right: 24px; box-sizing: border-box; }
 .detail-content::-webkit-scrollbar { width: 6px; }
 .detail-content::-webkit-scrollbar-thumb { background: rgba(128, 138, 154, 0.4); border-radius: 4px; }
 .detail-badge { display: inline-block; padding: 9px 18px; border: 1px solid rgba(169, 126, 55, 0.35); border-radius: 10px; background: rgba(190, 144, 67, 0.12); font-size: 22px; font-weight: 600; letter-spacing: 0.04em; }

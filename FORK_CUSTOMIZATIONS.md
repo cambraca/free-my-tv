@@ -96,14 +96,16 @@ available there; they do not replace the web watchlist matcher or add a generic 
 - IMDb's public visibility can differ from what its logged-in UI claims. The integration must work anonymously;
   do not solve visibility issues by embedding a personal session.
 
-### Matching and Plex priority
+### Matching and service priority
 
 - Match titles by IMDb IDs and exact TMDB resolution, not fuzzy title searches. Use TMDB's country-specific
   subscription availability for Netflix and MUBI; an app must also be installed and enabled in `watchlist_services`.
 - Scan every page of the configured Plex server's movie and show libraries, matching IMDb/TMDB GUIDs. This is the
   user's local library, not Plex's online catalogue. Movies need playable media; shows need available episodes.
 - Plex matches can work without a TMDB key. With TMDB available, retain its metadata/artwork and provider matches.
-- If Plex and another service both have a title, launch Plex first. Featured sampling also gives Plex extra weight.
+- Prefer **Netflix → Plex → MUBI** when more than one configured, installed service has a title. Apply this when
+  selecting a pick, even with legacy cached options stored Plex-first, so no refresh is needed to change priority.
+  Featured sampling still gives Plex-selected titles extra weight.
   This does not make Plex more likely in the uniformly shuffled Explore grid.
 - Keep `tools/watchlist-network.js` usable on the older Node runtime of the webOS service: redirects, gzip,
   timeouts, and response/error handling are shared with the local tools. Its working `FreeMyTV/1.0` user agent is
@@ -172,7 +174,7 @@ These two selection policies are deliberately different. Do not share one orderi
   A cold-start `webOSRelaunch` must not start a second session. Only a real hidden-to-foreground transition starts
   another session in the running app, consuming that transition once across visibility/relaunch events.
 - The grid uses `Watchlist.browse` / `Data.browse`; the featured cards use their separate weighted catalogue.
-  Plex is still the preferred launch provider for an Explore-grid title, even though its position is unweighted.
+  Netflix is the preferred launch provider for an Explore-grid title, even though its position is unweighted.
 - Remember the selected Explore/Movies/Shows/Unavailable tab across app launches. Each tab also retains its grid position
   while switching tabs in a session; do not reset the tab to Explore when reopening the app.
 - Screensaver artwork comes from the available watchlist picks, not a restored upstream trending feed.
@@ -235,10 +237,22 @@ These two selection policies are deliberately different. Do not share one orderi
   no Back button, no Unavailable badge, and no “not available on…” message. The remote's Back restores the exact
   featured/grid selection; arrows, Page Up/Down, and the pointer wheel scroll the description without moving
   the grid underneath. Ignore late detail responses after closing or selecting another title.
+- The LG remote's **red button** (403) opens the same details for a focused featured/grid title, including playable
+  titles. From the slideshow, it stops the slideshow and opens the current title's details; Back returns to the
+  underlying launcher page. Ignore held-red repeats. Red does nothing in menus or an already-open detail page.
+  Keep short-press OK's existing launch/trailer behavior; do not delay it to guess whether an OK hold is coming.
+  Right-clicking a featured/grid card in the browser preview opens that card's details too; right-clicking the
+  slideshow opens its current title. Suppress the browser context menu only on these title surfaces.
+- Detail pages show a fixed action row for each matching installed service, ordered Netflix → Plex → MUBI,
+  followed by the trailer action when available. Left/Right select a button, OK opens that exact service/title,
+  and Up/Down scroll the description. Preserve explicit service choices even when Netflix is the default provider.
+  Keep actions visible while the description scrolls; no service buttons appear for Unavailable titles.
+  The portrait poster is 596×894 at (80, 100) on the 1920×1080 stage; its bottom aligns with the 76px-high
+  action buttons at y=918. The description and actions begin at x=750, leaving a clear gap beside the poster.
 - Retain poster/synopsis/genres/rating/TMDB ID in cached picks. An older cache can fetch just the selected title's
   details on demand (exact IMDb lookup if its TMDB ID is missing), with coalesced requests and a session cache;
   do not recrawl the watchlist or block opening the detail page. Missing artwork/synopses have graceful fallbacks.
-- Show **Watch trailer** below the poster only when an exact YouTube trailer and the installed YouTube app are
+- Show **Watch trailer** in the detail action row only when an exact YouTube trailer and the installed YouTube app are
   known. TMDB's appended `videos` response supplies validated video IDs; prefer official trailers and the selected
   language, exclude unrelated clips/teasers, and do not scrape or autoplay the first arbitrary search result.
   The remote's OK activates the trailer button; Back remains independent. On LG, launch YouTube with
@@ -269,7 +283,7 @@ Key files: `web/index.html`, `web/home.js`, `web/home.css`, `web/data.js`, `web/
   **Settings → Start slideshow** provides the same action for remotes without a blue button.
   Ignore held-blue/OK-button repeats. Left/Right move to the previous/next slide, wrapping within the current shuffle
   and restarting the 12-second timer. OK/Enter dismisses the slideshow and launches its current title through the
-  same service/title-link path as the cards, retaining Plex priority. Never activate the focused card underneath.
+  same service/title-link path as the cards, retaining Netflix → Plex → MUBI priority. Never activate the focused card underneath.
   If there is no current title, OK simply dismisses it. Only Left/Right keep the slideshow open; other keys or pointer
   movement dismiss it without activating anything underneath. The blue shortcut preserves the current page/focus;
   the Settings action closes the menu. Cancel pending slide/fade timers when navigating or dismissing.
@@ -277,7 +291,7 @@ Key files: `web/index.html`, `web/home.js`, `web/home.css`, `web/data.js`, `web/
   (manual or automatic), beginning at its first item without changing the Explore grid's order. Cycle backdrops
   every 12 seconds with a gentle pan/zoom. Do not limit the pool to featured titles.
   Only installed-service matches with artwork qualify; Unavailable titles and generic recommendations do not.
-  Selection has no recency/Plex weighting; Plex remains the preferred service for matching titles. The order
+  Selection has no recency/Plex weighting; Netflix is the preferred service for matching titles. The order
   reshuffles on every slideshow start, independently of the Explore session. Images use `w1280`; the clock,
   date, current title, and a smaller metadata line (year, genre, runtime/show count, service) remain visible.
   Automatic activation still occurs after five idle minutes outside menus.
