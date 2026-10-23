@@ -177,12 +177,15 @@ These two selection policies are deliberately different. Do not share one orderi
   rendering bound. Activating an unavailable title opens its detail page instead of launching an unrelated app.
   Its label and status text are translated with the rest of the web UI.
 
-- Featured picks reshuffle on a new load, native relaunch, or return from a hidden/background state. Use a new
-  session seed, avoid the previous featured three when enough alternatives exist, and keep picks stable during
-  ordinary browsing. Keep each tab's selected IDs for the session when app discovery or a background snapshot
-  invalidates its catalogue; update their metadata/launch links and replace only titles no longer available.
-  A cold-start `webOSRelaunch` must not start a second session. Only a real hidden-to-foreground transition starts
-  another session in the running app, consuming that transition once across visibility/relaunch events.
+- Featured picks use deterministic 20-minute time windows (`floor(Date.now() / 1200000)`), restoring the original
+  hourly selection policy with a shorter interval. Reopening, native relaunch, or returning from the background
+  within a window keeps each tab's featured three. Persist their IDs with the source and window seed so restarts,
+  app discovery, and background snapshots retain eligible titles while updating metadata/launch links. Replace
+  watched, removed, or otherwise ineligible titles immediately. On the next window, sample afresh with the usual
+  recency/Plex weights; do not forcibly exclude the previous three. Active apps check window expiry during their
+  regular refresh tick. Explore-grid shuffling stays independent and uses the app-session seed.
+  A cold-start `webOSRelaunch` must not start a second browsing session. Consume each real hidden-to-foreground
+  transition once across visibility/relaunch events.
 - The grid uses `Watchlist.browse` / `Data.browse`; the featured cards use their separate weighted catalogue.
   Netflix is the preferred launch provider for an Explore-grid title, even though its position is unweighted.
 - Remember the selected Explore/Movies/Shows/Unavailable/Watched tab across app launches. Each tab also retains its grid position
@@ -446,7 +449,7 @@ The first upstream merge needed these specific combinations; future merges must 
   in the known-app list so it does not disappear on TVs that deny `listLaunchPoints`. Browser samples stay separate.
 - Samsung keeps upstream's bundled icons, corrected app names, duplicate-Netflix/internal-app filtering, and
   Settings-menu fallback, without restoring input shortcuts or changing this fork's shelf selection.
-- `reopened()` retains upstream's `PalmSystem.activate()` foreground fix **and** this fork's session reshuffle,
+- `reopened()` retains upstream's `PalmSystem.activate()` foreground fix **and** this fork's 20-minute featured window,
   selected-tab retention, and full UI refresh.
 - Upstream's shelf-height calculations must not leave undefined variables or restore the old oversized shelf.
   Reconcile dimensions with this fork's CSS and pinned-grid placement, not just the conflict-marker lines.

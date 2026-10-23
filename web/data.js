@@ -192,19 +192,26 @@ var Data = (function () {
   }
   var fetchingRecs = false, pollingRecs = false, pollTimer = 0, recsError = '';
   var active = !document.hidden, nextRecsAt = 0, savedRecsAt = snapshot ? snapshot.updatedAt : 0;
-  var sessionSeed = '', sessionAt = 0, catalogs = {}, browseCatalogs = {}, previousFeatured = {}, featured = {}, sessionFeatured = {};
+  var sessionSeed = '', sessionAt = 0, catalogs = {}, browseCatalogs = {}, featuredSeed = '', sessionFeatured = {};
+
+  function refreshFeaturedWindow() {
+    var seed = String(Math.floor(Date.now() / (20 * 60000)));
+    if (seed === featuredSeed) return false;
+    featuredSeed = seed;
+    var previous = stored('featured');
+    sessionFeatured = previous && previous.source === Watchlist.source(CONFIG) && previous.seed === seed
+      ? previous.tabs || {} : {};
+    catalogs = {};
+    return true;
+  }
 
   function startSession() {
     if (sessionAt && Date.now() - sessionAt < 1000) return;
     sessionAt = Date.now();
     sessionSeed = sessionAt + ':' + Math.random();
-    var previous = stored('featured');
-    previousFeatured = previous && previous.source === Watchlist.source(CONFIG) ? previous.tabs || {} : {};
-    featured = {};
-    for (var key in previousFeatured) if (previousFeatured.hasOwnProperty(key)) featured[key] = previousFeatured[key];
+    refreshFeaturedWindow();
     catalogs = {};
     browseCatalogs = {};
-    sessionFeatured = {};
   }
 
   startSession();
@@ -231,12 +238,13 @@ var Data = (function () {
   }
 
   function catalog(kind) {
+    refreshFeaturedWindow();
     var key = kind || 'explore';
     if (catalogs[key]) return catalogs[key];
     var list = Watchlist.select(catalogPicks(), kind, function (service) {
       return (CONFIG.watchlistServices || []).indexOf(service) >= 0 && !!appFor(service);
-    }, sessionSeed, null).map(withTvCounts);
-    var previous = previousFeatured[key] || [], chosen = [], selected = {};
+    }, featuredSeed, null).map(withTvCounts);
+    var chosen = [], selected = {};
     var retained = sessionFeatured[key] || [];
     for (var retainedIndex = 0; retainedIndex < retained.length; retainedIndex++) {
       for (var listIndex = 0; listIndex < list.length; listIndex++) {
@@ -248,18 +256,17 @@ var Data = (function () {
       }
     }
     for (var index = 0; index < list.length && chosen.length < 3; index++) {
-      if (!selected[list[index].id] && previous.indexOf(list[index].id) < 0) {
+      if (!selected[list[index].id]) {
         chosen.push(list[index]); selected[list[index].id] = true;
       }
     }
-    for (var remaining = 0; remaining < list.length && chosen.length < 3; remaining++) {
-      if (!selected[list[remaining].id]) { chosen.push(list[remaining]); selected[list[remaining].id] = true; }
-    }
     catalogs[key] = chosen.concat(list.filter(function (pick) { return !selected[pick.id]; }));
     if (chosen.length) {
-      featured[key] = chosen.map(function (pick) { return pick.id; });
-      sessionFeatured[key] = featured[key];
-      store('featured', {source: Watchlist.source(CONFIG), tabs: featured});
+      var ids = chosen.map(function (pick) { return pick.id; });
+      if (JSON.stringify(ids) !== JSON.stringify(sessionFeatured[key])) {
+        sessionFeatured[key] = ids;
+        store('featured', {source: Watchlist.source(CONFIG), seed: featuredSeed, tabs: sessionFeatured});
+      }
     }
     return catalogs[key];
   }
@@ -376,7 +383,12 @@ var Data = (function () {
       if (active) nextRecsAt = 0;
     },
     appFor: appFor,
-    refresh: function () { if (active) { refreshWeather(); refreshRecs(); } },
+    refresh: function () {
+      if (!active) return;
+      if (refreshFeaturedWindow()) changed('watchlist');
+      refreshWeather();
+      refreshRecs();
+    },
     settingsChanged: changed,
     get weather() { return weather; },
     get weatherAt() { return weatherAt; },
