@@ -318,7 +318,7 @@ var Data = (function () {
 
   var detailCache = {}, detailPending = {};
   function details(pick, done) {
-    if (pick.detailsLoaded && typeof pick.trailer === 'string') { done(null, pick); return; }
+    if (pick.detailsLoaded && typeof pick.trailer === 'string' && pick.credits) { done(null, pick); return; }
     if (detailCache[pick.id]) { done(null, detailCache[pick.id]); return; }
     if (detailPending[pick.id]) { detailPending[pick.id].push(done); return; }
     var key = (CONFIG.tmdbKey || '').trim();
@@ -337,7 +337,7 @@ var Data = (function () {
         bearer ? {Authorization: 'Bearer ' + key} : {}, callback);
     }
     function load(id) {
-      tmdb('/' + pick.kind + '/' + id + '?append_to_response=videos&include_video_language=en,'
+      tmdb('/' + pick.kind + '/' + id + '?append_to_response=videos,credits&include_video_language=en,'
         + I18N.lang, function (error, detail) {
         if (error) { finish(error); return; }
         if (!detail || Number(detail.id) !== Number(id)) { finish(new Error('Title details are unavailable.')); return; }
@@ -348,6 +348,7 @@ var Data = (function () {
         result.genres = (detail.genres || []).map(function (genre) { return genre.name; });
         result.rating = detail.vote_count > 0 ? Number(detail.vote_average) || 0 : 0;
         result.trailer = Watchlist.trailer(detail.videos, I18N.lang);
+        result.credits = Watchlist.credits(detail, pick.kind);
         result.detailsLoaded = true;
         finish(null, result);
       });

@@ -433,6 +433,10 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .detail-genres span { display: inline-block; margin: 0 10px 10px 0; padding: 8px 16px; border-radius: 9px; background: rgba(128, 138, 154, 0.12); font-size: 23px; }
 .detail-rating { margin-top: 12px; font-size: 28px; color: #9B6A16; }
 .night .detail-rating { color: #EDC576; }
+.detail-credits { margin-top: 20px; font-size: 26px; line-height: 1.45; }
+.detail-credit { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-height: 2.9em; overflow: hidden; }
+.detail-credit + .detail-credit { margin-top: 6px; }
+.detail-credit-label { font-weight: 600; opacity: 0.65; }
 .detail-overview { margin: 28px 0; font-size: 32px; line-height: 1.55; }
 .detail-note { margin: 30px 0; padding: 8px 0 8px 24px; border-left: 3px solid #A8B4C8; font-size: 28px; line-height: 1.5; white-space: pre-wrap; }
 .detail-note-label { margin-bottom: 8px; font-size: 22px; font-weight: 600; opacity: 0.6; }

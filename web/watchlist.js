@@ -82,6 +82,25 @@
     return selected;
   }
 
+  function credits(detail, kind) {
+    var source = detail.credits || {};
+    function names(people, limit) {
+      var result = [];
+      for (var index = 0; index < people.length && result.length < limit; index++) {
+        var name = typeof people[index].name === 'string' ? people[index].name.trim() : '';
+        if (name && result.indexOf(name) < 0) result.push(name);
+      }
+      return result;
+    }
+    var cast = (source.cast || []).slice().sort(function (left, right) {
+      return (typeof left.order === 'number' ? left.order : 9999)
+        - (typeof right.order === 'number' ? right.order : 9999);
+    });
+    return {cast: names(cast, 4), directors: kind === 'movie' ? names((source.crew || []).filter(function (person) {
+      return person.job === 'Director';
+    }), 2) : [], creators: kind === 'tv' ? names(detail.created_by || [], 2) : []};
+  }
+
   function crawl(config, request, done) {
     function graphql(query, variables, callback) {
       request('POST', 'https://api.graphql.imdb.com/', {
@@ -280,7 +299,7 @@
     var language = !config.language || config.language === 'auto' ? 'en' : config.language;
     function details(kind, item) {
       tmdb('/' + kind + '/' + item.id + '?language=' + encodeURIComponent(language)
-          + '&append_to_response=watch/providers,videos&include_video_language=en,'
+          + '&append_to_response=watch/providers,videos,credits&include_video_language=en,'
           + encodeURIComponent(language.split('-')[0]), function (detailError, detail) {
         if (detailError) { done(new Error('TMDB: ' + detailError.message)); return; }
         var providers = detail['watch/providers'], here = providers && providers.results
@@ -300,6 +319,7 @@
           genres: (detail.genres || []).map(function (genre) { return genre.name; }),
           rating: detail.vote_count > 0 ? Number(detail.vote_average) || 0 : 0,
           trailer: trailer(detail.videos, language),
+          credits: credits(detail, kind),
           meta: [entry.year, detail.genres && detail.genres[0] && detail.genres[0].name,
             kind === 'movie' && detail.runtime ? duration(detail.runtime) : ''].filter(Boolean).join(' · ')};
         if (kind === 'tv') {
@@ -353,6 +373,7 @@
         overview: resolved && resolved.overview || '', genres: resolved && resolved.genres || [],
         rating: resolved && resolved.rating || 0, detailsLoaded: !!(resolved && typeof resolved.overview === 'string'),
         trailer: resolved && resolved.trailer,
+        credits: resolved && resolved.credits,
         meta: formatMeta(resolved && resolved.meta || String(entry.year || '')), note: entry.note || '',
         seasons: resolved && resolved.seasons, episodes: resolved && resolved.episodes,
         watched: !!(local && local.watched), options: options, rank: entry.rank, addedAt: entry.addedAt});
@@ -511,7 +532,8 @@
   }
 
   return {source: source, valid: valid, fresh: fresh, notesReady: notesReady, plexLinksReady: plexLinksReady,
-    availabilityReady: availabilityReady, watchedReady: watchedReady, clientSnapshot: clientSnapshot, trailer: trailer,
+    availabilityReady: availabilityReady, watchedReady: watchedReady, clientSnapshot: clientSnapshot,
+    trailer: trailer, credits: credits,
     crawl: crawl, scanPlex: scanPlex, plexTarget: plexTarget, providerLinks: providerLinks,
     sync: sync, select: select, browse: browse};
 });

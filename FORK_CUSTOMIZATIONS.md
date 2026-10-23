@@ -271,6 +271,12 @@ These two selection policies are deliberately different. Do not share one orderi
 - Retain poster/synopsis/genres/rating/TMDB ID in cached picks. An older cache can fetch just the selected title's
   details on demand (exact IMDb lookup if its TMDB ID is missing), with coalesced requests and a session cache;
   do not recrawl the watchlist or block opening the detail page. Missing artwork/synopses have graceful fallbacks.
+- Detail popups include compact text credits above the synopsis: up to two directors for movies or two creators
+  for shows, plus the first four billed cast members. Deduplicate names and omit missing rows; keep each row to
+  at most two lines, with no portraits or character biographies. Credits inherit the theme and scroll with the
+  description. Append TMDB `credits` to existing title-detail requests, retain only these bounded name lists in
+  metadata/client caches, and fetch missing credits on demand for older cached picks without forcing a recrawl.
+  Show genres only in the genre chips on detail popups; remove matching genre text from the metadata line.
 - Show **Watch trailer** in the detail action row only when an exact YouTube trailer and the installed YouTube app are
   known. TMDB's appended `videos` response supplies validated video IDs; prefer official trailers and the selected
   language, exclude unrelated clips/teasers, and do not scrape or autoplay the first arbitrary search result.

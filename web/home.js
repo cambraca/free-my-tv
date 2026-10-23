@@ -736,6 +736,13 @@
     });
   }
 
+  function renderCredit(parent, label, names) {
+    if (!names || !names.length) return;
+    var row = el('div', 'detail-credit', parent);
+    el('span', 'detail-credit-label', row, label + ': ');
+    el('span', '', row, names.join(', '));
+  }
+
   function renderDetails(pick, loading) {
     var page = $('details');
     var previous = $('detail-content'), scroll = previous ? previous.scrollTop : 0;
@@ -769,10 +776,20 @@
     el('div', 'detail-badge', content, pick.kind === 'tv' ? tr('Série', 'TV show', 'Serie') : tr('Filme', 'Movie', 'Película'));
     var title = el('h2', 'detail-title', content, pick.title);
     title.id = 'detail-title';
-    el('div', 'detail-meta', content, pick.meta || '');
+    var genreNames = (pick.genres || []).map(function (genre) { return genre.toLowerCase(); });
+    var metadata = (pick.meta || '').split(' · ').filter(function (part) {
+      return genreNames.indexOf(part.toLowerCase()) < 0;
+    }).join(' · ');
+    el('div', 'detail-meta', content, metadata);
     var genres = el('div', 'detail-genres', content);
     (pick.genres || []).forEach(function (genre) { el('span', '', genres, genre); });
     if (pick.rating > 0) el('div', 'detail-rating', content, '★ ' + pick.rating.toFixed(1) + ' / 10 · TMDB');
+    var people = pick.credits || {}, filmmakers = pick.kind === 'tv' ? people.creators : people.directors;
+    if (filmmakers && filmmakers.length || people.cast && people.cast.length) {
+      var credits = el('div', 'detail-credits', content);
+      renderCredit(credits, pick.kind === 'tv' ? tr('Criação', 'Created by', 'Creación') : tr('Direção', 'Directed by', 'Dirección'), filmmakers);
+      renderCredit(credits, tr('Elenco', 'Cast', 'Reparto'), people.cast);
+    }
     el('p', 'detail-overview', content, pick.overview || (loading
       ? tr('Carregando detalhes…', 'Loading details…', 'Cargando detalles…')
       : tr('Sinopse indisponível.', 'No synopsis available.', 'Sinopsis no disponible.')));
