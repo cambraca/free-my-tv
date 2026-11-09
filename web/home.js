@@ -481,6 +481,7 @@
   }
 
   function closeSheets() {
+    torrentGeneration++; torrentView = false;
     detailRequest++;
     setClass($('details'), 'open', false);
     setClass($('apps'), 'open', false);
@@ -708,15 +709,117 @@
     }
   }
 
+  var torrentJobs = [], torrentSeason = 1, torrentSearch = null, torrentResults = null;
+  var torrentLatest = [], torrentFrozen = false, torrentDownloading = false;
+  var torrentSeasons = [], torrentSeasonMessage = '';
+  var torrentMessage = '', torrentBusy = false, torrentView = false, torrentGeneration = 0;
+  function torrentCall(payload, done) {
+    payload.imdbId = detailPick && (detailPick.imdbId || detailPick.id);
+    TV.torrents(payload, function (result) { done(result || {error: 'Download service unavailable'}); });
+  }
+  function searchTorrents(keepFocus) {
+    var seasonCount = Number(detailPick.seasons) || 0;
+    torrentSeason = Math.max(1, Math.min(torrentSeason, seasonCount || 999));
+    var previousSearch = torrentSearch, searchImdbId = detailPick.imdbId || detailPick.id;
+    torrentSearch = null; torrentLatest = []; torrentFrozen = false;
+    var generation = ++torrentGeneration;
+    torrentBusy = true; torrentView = true; torrentResults = null;
+    if (!keepFocus) detailAction = 0;
+    torrentMessage = tr('Buscando…', 'Searching…', 'Buscando…');
+    renderDetails(detailPick, false);
+    torrentCall({action: 'search', season: torrentSeason, previousSearchId: previousSearch}, function (result) {
+      if (generation !== torrentGeneration || st.zone !== Z.DETAILS) {
+        if (result.searchId !== undefined) TV.torrents({action: 'cancel', searchId: result.searchId, imdbId: searchImdbId}, function () {});
+        return;
+      }
+      if (result.error) { torrentBusy = false; torrentMessage = result.error; renderDetails(detailPick, false); return; }
+      torrentSearch = result.searchId;
+      function results() {
+        if (generation !== torrentGeneration || st.zone !== Z.DETAILS) return;
+        torrentCall({action: 'results', searchId: torrentSearch}, function (r) {
+          if (generation !== torrentGeneration || st.zone !== Z.DETAILS) return;
+          torrentBusy = !!r.running && !r.error;
+          if (r.results) torrentLatest = r.results.slice(0, 20);
+          torrentMessage = r.error || (torrentBusy
+            ? tr('Buscando…', 'Searching…', 'Buscando…') + ' (' + (r.results || []).length + ')'
+            : (r.results || []).length + ' ' + tr('resultados', 'results', 'resultados'));
+          // Keep rows and download identities fixed once the user starts browsing them.
+          if (!torrentFrozen && JSON.stringify(torrentResults) !== JSON.stringify(torrentLatest)) {
+            torrentResults = torrentLatest;
+            renderDetails(detailPick, false);
+          } else if ($('torrent-search-status')) $('torrent-search-status').textContent = torrentMessage;
+          if (r.running && !r.error) setTimeout(results, 2000);
+        });
+      }
+      results();
+    });
+  }
+  function cancelTorrentSearch() {
+    if (torrentSearch === null) return;
+    torrentCall({action: 'cancel', searchId: torrentSearch}, function () {});
+    torrentSearch = null;
+  }
+
+  function hasTorrentDownload(pick) {
+    return torrentJobs.some(function (job) {
+      return job.imdbId === (pick.imdbId || pick.id) && !!job.hash && job.state !== 'Removed from qBittorrent';
+    });
+  }
+
+  function pollTorrents() {
+    if (!CONFIG.qbitUrl || document.hidden || !(TV.isWebOS || TV.isPreview)) return;
+    TV.torrents({action: 'status', imdbId: st.zone === Z.DETAILS && detailPick ? detailPick.imdbId || detailPick.id : ''}, function (result) {
+      if (!result || result.error) return;
+      var previousJobs = JSON.stringify(torrentJobs);
+      torrentJobs = result.jobs || [];
+      if (result.snapshotAt > Data.watchlistVersion()) Data.checkWatchlist();
+      if (previousJobs !== JSON.stringify(torrentJobs) && st.zone === Z.DETAILS && detailPick && !torrentView) renderDetails(detailPick, false);
+    });
+  }
+  setInterval(pollTorrents, 5000);
+
   function activateDetailAction() {
     var action = detailActions[detailAction];
     if (!action || !detailPick) return;
+    if (action.torrentUpdate) {
+      torrentResults = torrentLatest; torrentFrozen = true;
+      renderDetails(detailPick, false); return;
+    }
+    if (action.torrentSearch) { searchTorrents(); return; }
+    if (action.season) {
+      var seasonCount = Number(detailPick.seasons) || 0;
+      torrentSeason = Math.max(1, Math.min(torrentSeason + action.season, seasonCount || 999));
+      // Keep focus on the same direction, or the remaining season control at the boundary.
+      detailAction = action.season > 0 && (!seasonCount || torrentSeason < seasonCount) ? 2 : 1;
+      if (seasonCount === 1) detailAction = 0;
+      searchTorrents(true);
+      return;
+    }
+    if (action.torrentBack) { cancelTorrentSearch(); torrentView = false; torrentGeneration++; renderDetails(detailPick, false); return; }
+    if (action.torrentDownload) {
+      if (!action.torrentResult) {
+        torrentMessage = tr('Atualize o serviço de downloads e busque novamente.',
+          'Download service is outdated. Restart the preview server or update the webOS app, then search again.',
+          'Actualiza el servicio de descargas y busca de nuevo.');
+        renderDetails(detailPick, false);
+        return;
+      }
+      if (torrentBusy && !torrentResults) return;
+      if (torrentDownloading) return;
+      torrentDownloading = true; torrentGeneration++; torrentBusy = true;
+      torrentCall({action: 'download', searchId: torrentSearch, resultId: action.torrentResult}, function (r) {
+        torrentBusy = false; torrentDownloading = false;
+        if (r.error) { torrentMessage = r.error; renderDetails(detailPick, false); return; }
+        cancelTorrentSearch(); torrentView = false; torrentMessage = ''; pollTorrents(); renderDetails(detailPick, false);
+      });
+      return;
+    }
     if (action.option) {
       launcher(action.app.id, action.app.title, {id: detailPick.id, imdbId: detailPick.imdbId,
         title: detailPick.title, app: action.option.app, url: action.option.url})();
     } else if (action.watched) {
       Data.markWatched(detailPick);
-    } else playTrailer();
+    } else if (action.trailer) playTrailer();
   }
 
   function detailButton(parent, label, action) {
@@ -725,9 +828,11 @@
     button.onmouseover = function () {
       if (st.zone !== Z.DETAILS || saverOn) return;
       detailAction = index;
+      if (action.torrentDownload) torrentFrozen = true;
       focusDetailActions();
     };
     button.onclick = function () { poke(); detailAction = index; focusDetailActions(); activateDetailAction(); };
+    return button;
   }
   function playTrailer() {
     var app = Data.appFor('youtube');
@@ -749,6 +854,34 @@
     var previous = $('detail-content'), scroll = previous ? previous.scrollTop : 0;
     page.innerHTML = '';
     detailPick = pick;
+    if (torrentView) {
+      detailActions = [];
+      var searchContent = el('div', 'detail-content torrent-content', page);
+      searchContent.id = 'detail-content';
+      el('h2', 'detail-title', searchContent, pick.title + (pick.kind === 'tv' ? ' · S' + torrentSeason : ''));
+      el('p', '', searchContent, torrentMessage).id = 'torrent-search-status';
+      var searchControls = el('div', 'torrent-controls', searchContent);
+      detailButton(searchControls, tr('Voltar', 'Back', 'Volver'), {torrentBack: true});
+      if (pick.kind === 'tv') {
+        el('span', 'torrent-season', searchControls, tr('Temporada ', 'Season ', 'Temporada ') + torrentSeason);
+        if (torrentSeason > 1) detailButton(searchControls, '−', {season: -1});
+        if (!pick.seasons || torrentSeason < Number(pick.seasons)) detailButton(searchControls, '+', {season: 1});
+      }
+      detailButton(searchControls, tr('Atualizar resultados', 'Update results', 'Actualizar resultados'), {torrentUpdate: true});
+      (torrentResults || []).forEach(function (r) {
+        var button = detailButton(searchContent, '', {torrentDownload: true, torrentResult: r.id});
+        setClass(button, 'torrent-result', true);
+        var row = el('span', 'torrent-result-row', button);
+        var name = el('span', 'torrent-name', row);
+        el('span', 'torrent-name-text', name, r.name);
+        el('span', 'torrent-seeds', row, r.seeds + ' seeds');
+        el('span', 'torrent-size', row, (r.size / 1073741824).toFixed(1) + ' GB');
+      });
+      detailAction = Math.max(0, Math.min(detailAction, detailActions.length - 1));
+      focusDetailActions();
+      searchContent.scrollTop = scroll;
+      return;
+    }
     var poster = el('div', 'detail-poster', page);
     el('div', 'detail-poster-fallback', poster, pick.title);
     if (pick.poster) {
@@ -770,10 +903,21 @@
       '▶ ' + tr('Ver trailer', 'Watch trailer', 'Ver tráiler'), {trailer: true});
     if (!Data.isWatched(pick)) detailButton(actions,
       tr('Marcar como assistido', 'Mark as watched', 'Marcar como visto'), {watched: true});
+    if (CONFIG.qbitUrl && (TV.isWebOS || TV.isPreview) && !hasTorrentDownload(pick)
+        && (!(pick.options || []).length || pick.kind === 'tv')) {
+      detailButton(actions, tr('Buscar torrents', 'Search torrents', 'Buscar torrents') + (pick.kind === 'tv' ? ' · S' + torrentSeason : ''), {torrentSearch: true});
+    }
     detailAction = Math.max(0, Math.min(detailAction, detailActions.length - 1));
     focusDetailActions();
     var content = el('div', 'detail-content', page);
     content.id = 'detail-content';
+    if (!(pick.options || []).length) torrentJobs.forEach(function (job) {
+      if (job.imdbId === (pick.imdbId || pick.id)) el('p', 'torrent-progress', content,
+        (job.season ? 'S' + job.season + ' · ' : '') + Math.floor((job.progress || 0) * 100) + '% · ' +
+        (job.complete ? tr('Aguardando Plex…', 'Waiting for Plex…', 'Esperando Plex…') : job.state));
+    });
+    if (CONFIG.qbitUrl && pick.kind === 'tv') el('p', 'torrent-progress', content,
+      torrentSeasonMessage || (torrentSeasons.length ? tr('Temporadas no Plex: ', 'Seasons in Plex: ', 'Temporadas en Plex: ') + torrentSeasons.join(', ') : tr('Nenhuma temporada no Plex', 'No seasons in Plex', 'Ninguna temporada en Plex')));
     el('div', 'detail-badge', content, pick.kind === 'tv' ? tr('Série', 'TV show', 'Serie') : tr('Filme', 'Movie', 'Película'));
     var title = el('h2', 'detail-title', content, pick.title);
     title.id = 'detail-title';
@@ -803,6 +947,7 @@
   }
 
   function openDetails(pick) {
+    torrentView = false; torrentGeneration++; torrentSeason = 1; torrentMessage = ''; torrentSeasons = []; torrentSeasonMessage = '';
     detailReturn = st.zone;
     var request = ++detailRequest;
     detailAction = 0;
@@ -811,6 +956,14 @@
     renderDetails(pick, !pick.detailsLoaded);
     setClass($('details'), 'open', true);
     updateFocus();
+    if (CONFIG.qbitUrl && pick.kind === 'tv') torrentCall({action: 'seasons'}, function (result) {
+      if (st.zone !== Z.DETAILS || request !== detailRequest || torrentView) return;
+      torrentSeasons = result.seasons || [];
+      torrentSeasonMessage = result.error || '';
+      torrentSeason = Math.min(result.next || 1, Number(detailPick.seasons) || 999);
+      renderDetails(detailPick, false);
+    });
+    pollTorrents();
     Data.details(pick, function (error, detail) {
       if (st.zone === Z.DETAILS && request === detailRequest) renderDetails(detail || pick, false);
     });
@@ -829,6 +982,8 @@
   }
 
   function closeDetails() {
+    if (torrentView) { cancelTorrentSearch(); torrentView = false; torrentGeneration++; renderDetails(detailPick, false); return; }
+    torrentGeneration++; torrentView = false;
     detailRequest++;
     setClass($('details'), 'open', false);
     st.zone = detailReturn === Z.CARDS && !cards.length ? Z.SHELF : detailReturn;
@@ -839,8 +994,17 @@
     var tiles = $('tiles').children, cardNodes = $('cards').children;
     switch (st.zone) {
       case Z.DETAILS:
+        if (torrentView && dy) {
+          detailAction = Math.max(0, Math.min(detailActions.length - 1, detailAction + dy));
+          if (detailActions[detailAction] && detailActions[detailAction].torrentDownload) torrentFrozen = true;
+          focusDetailActions();
+          var focusedResult = $('details').querySelectorAll('.detail-action')[detailAction];
+          if (focusedResult) $('detail-content').scrollTop = Math.max(0, focusedResult.offsetTop - 180);
+          return;
+        }
         if (dx) {
           detailAction = Math.max(0, Math.min(detailActions.length - 1, detailAction + dx));
+          if (torrentView && detailActions[detailAction] && detailActions[detailAction].torrentDownload) torrentFrozen = true;
           focusDetailActions();
         } else $('detail-content').scrollTop += dy * 160;
         return;
@@ -1182,7 +1346,11 @@
     if (kind === 'watchlist' || kind === 'settings') {
       renderCards();
       renderDrawer();
-      if (st.zone === Z.DETAILS && detailPick) renderDetails(detailPick, false);
+      if (st.zone === Z.DETAILS && detailPick) {
+        var latestPick = Data.currentPick(detailPick.imdbId || detailPick.id);
+        if (latestPick) detailPick = latestPick;
+        renderDetails(detailPick, false);
+      }
     }
     if (kind === 'weather' || kind === 'settings') renderPanels();
     if (st.zone === Z.SETTINGS) renderSettings();

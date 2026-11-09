@@ -519,6 +519,21 @@ var TV = (function () {
     isWebOS: webos,
     isPreview: !!window.FMTV_PREVIEW,
 
+    torrents: function (payload, done) {
+      if (webos) { luna('luna://io.freemytv.watchlist/torrents', payload, done); return; }
+      if (!window.FMTV_PREVIEW) { done({error: 'Downloads require webOS or browser preview'}); return; }
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/torrents', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.timeout = 30000;
+      xhr.onload = function () {
+        var result; try { result = JSON.parse(xhr.responseText); } catch (e) {}
+        done(result || {error: 'Download service unavailable'});
+      };
+      xhr.onerror = xhr.ontimeout = function () { done({error: 'Download service unavailable'}); };
+      xhr.send(JSON.stringify(payload));
+    },
+
     watchlist: function (done, force, known) {
       if (!webos && window.FMTV_PREVIEW) {
         var request = new XMLHttpRequest();

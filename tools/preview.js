@@ -19,12 +19,14 @@ const clients = new Set();
 const mime = {'.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ttf': 'font/ttf'};
 let config, snapshot, snapshotPath, Watchlist, request;
+let torrents;
 let refreshing = false, attemptedAt = 0, lastError = '', building = false, queued = false, debounce;
 
 function load() {
   const content = fs.readFileSync(path.join(directory, 'config.js'), 'utf8');
-  const nextConfig = JSON.parse(content.split('window.CONFIG = ')[1].trim().replace(/;$/, ''));
-  for (const filename of ['./watchlist-network', '../web/watchlist']) delete require.cache[require.resolve(filename)];
+  const publicConfig = JSON.parse(content.split('window.CONFIG = ')[1].trim().replace(/;$/, ''));
+  const nextConfig = {...publicConfig, ...JSON.parse(fs.readFileSync(path.join(directory, 'watchlist-backend.json'), 'utf8'))};
+  for (const filename of ['./watchlist-network', '../web/watchlist', '../webos/service/qbittorrent', '../webos/service/plex-scan']) delete require.cache[require.resolve(filename)];
   Watchlist = require('../web/watchlist');
   request = require('./watchlist-network');
   const identity = crypto.createHash('sha256').update(JSON.stringify(nextConfig, Object.keys(nextConfig).sort())).digest('hex').slice(0, 16);
@@ -39,7 +41,8 @@ function load() {
     attemptedAt = 0;
     lastError = '';
   }
-  if (!config || Watchlist.source(config) !== Watchlist.source(nextConfig)) config = nextConfig;
+  config = nextConfig;
+  torrents = require('../webos/service/qbittorrent')(config, path.join(root, 'out', 'watchlist', 'torrents.json'), () => snapshot, () => scanPlex());
   attemptedAt = 0;
   lastError = '';
   try {
@@ -73,6 +76,11 @@ function refresh(force) {
   }, force);
 }
 
+function scanPlex() {
+  require('../webos/service/plex-scan')(config, request, () => refresh(true));
+}
+setInterval(() => { if (torrents) torrents({action: 'status'}, () => {}); }, 60000).unref();
+
 function send(response, status, type, body) {
   response.writeHead(status, {'Content-Type': type, 'Cache-Control': 'no-store'});
   response.end(body);
@@ -89,6 +97,16 @@ const server = http.createServer((incoming, response) => {
     incoming.on('close', () => clients.delete(response));
     return;
   }
+  if (pathname === '/api/torrents') {
+    if (incoming.method !== 'POST' || incoming.headers['content-type'] !== 'application/json' || (incoming.headers.origin && incoming.headers.origin !== 'http://' + incoming.headers.host)) { send(response, 403, 'text/plain', 'Forbidden'); return; }
+    let body = '';
+    incoming.on('data', chunk => { body += chunk; if (body.length > 8192) incoming.destroy(); });
+    incoming.on('end', () => {
+      let payload; try { payload = JSON.parse(body); } catch (error) { send(response, 400, 'text/plain', 'Bad request'); return; }
+      torrents(payload, (error, result) => send(response, 200, 'application/json', JSON.stringify(error ? {error: error.message} : result)));
+    });
+    return;
+  }
   if (pathname === '/api/watchlist') {
     const query = new URL(incoming.url, 'http://localhost').searchParams;
     refresh(query.get('refresh') === '1');
@@ -96,6 +114,7 @@ const server = http.createServer((incoming, response) => {
     send(response, 200, 'application/json', JSON.stringify({returnValue: true, snapshot: client, refreshing, error: lastError}));
     return;
   }
+  if (pathname === '/watchlist-backend.json' || pathname === '/watchlist-service-seed.json') { send(response, 403, 'text/plain', 'Forbidden'); return; }
   const filename = path.resolve(directory, '.' + (pathname === '/' ? '/index.html' : pathname));
   if (!filename.startsWith(directory + path.sep)) { send(response, 403, 'text/plain', 'Forbidden'); return; }
   fs.readFile(filename, (error, content) => {

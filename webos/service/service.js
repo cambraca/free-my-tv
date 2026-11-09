@@ -94,3 +94,25 @@ service.register('openPlex', function (message) {
 });
 
 require('./remote-apps')(service);
+
+var torrents = require('./qbittorrent')(config, '/media/internal/io.freemytv.torrents.json',
+  function () { return snapshot; }, function () {
+    require('./plex-scan')(config, request, function () { refresh(true); });
+  });
+service.register('torrents', function (message) {
+  function respond() {
+    service.activityManager.create('torrent-request', function (activity) {
+      torrents(message.payload, function (err, result) {
+        message.respond(err ? {returnValue: true, error: err.message} : result);
+        service.activityManager.complete(activity);
+      });
+    });
+  }
+  if (loading) waiting.push(respond); else respond();
+});
+setInterval(function () {
+  if (loading || !config.qbitUrl) return;
+  service.activityManager.create('torrent-poll', function (activity) {
+    torrents({action: 'status'}, function () { service.activityManager.complete(activity); });
+  });
+}, 60000);

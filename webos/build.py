@@ -161,7 +161,7 @@ def build(preview, config, generic=False, hd=False):
     service_files['watchlist-seed.json'] = app.pop('watchlist-service-seed.json')
     for name, content in service_files.items():
         entries.append((service_base + '/' + name, content))
-    entries = [entry for entry in entries if not entry[0].endswith('/watchlist-service-seed.json')]
+    entries = [entry for entry in entries if not entry[0].endswith(('/watchlist-service-seed.json', '/watchlist-backend.json'))]
     package = json.dumps({'id': app_id, 'version': version, 'app': app_id, 'services': [service_id]}, indent=2).encode('utf-8')
     entries += [('usr/palm/packages', None), ('usr/palm/packages/' + app_id, None),
                 ('usr/palm/packages/' + app_id + '/packageinfo.json', package)]
@@ -176,6 +176,7 @@ def build(preview, config, generic=False, hd=False):
         f.write(data)
 
     if preview:
+        app['watchlist-backend.json'] = json.dumps(config).encode('utf-8')
         webapp.preview(app, OUT)
         print('Preview: run node tools/preview.js --no-build, then open http://127.0.0.1:8000.')
     print('Built %s (%s %s, %d KB)' % (os.path.basename(IPK), app_id, version, len(data) // 1024))

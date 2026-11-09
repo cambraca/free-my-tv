@@ -494,3 +494,38 @@ The first upstream merge needed these specific combinations; future merges must 
    Use mocks for platform discovery, pairing, and launches instead of connecting to the TV.
 7. Stage only intended source/docs changes. Verify no private config/cache/artifacts or unrelated user changes are
    included. Commit when requested; do not push or deploy as part of resolving a merge.
+
+## Optional qBittorrent downloads (1.1.19)
+
+- WebOS and the localhost preview use the qBittorrent v5 Web API, configured independently of Plex through
+  `qbittorrent_url`, `qbittorrent_username`, `qbittorrent_password`, `qbittorrent_movies_path`, and
+  `qbittorrent_shows_path`. An empty URL disables the feature. Paths are on the qBittorrent host; Plex must be
+  able to read those files. No file copying or renaming is performed. Enable Web UI and compatible search plugins
+  in qBittorrent yourself. Generic builds stay disabled. Android/Tizen have no download backend.
+- Unavailable title details offer Search torrents. Hide this action while a confirmed torrent hash is tracked
+  for the title, including while waiting for Plex; allow searching again if qBittorrent reports it removed. The search results screen allows choosing a season with −/+ for later
+  seasons even when earlier episodes are in Plex; changing season starts a new search. Hide − on season 1
+  and + on the final known season; clamp suggested/search seasons to the known total. Unknown totals retain +. Read season presence from Plex and suggest the first absent
+  season; presence does not prove a season is complete. Search only plugins supporting movies/tv categories.
+  Show queries use Sxx and omit explicit single episode releases; users must inspect release names for complete
+  packs. Show the top 20 results as they arrive, sorted by seeds descending. Freeze visible rows when the user
+  navigates/points at a result; Update results explicitly applies the latest top 20. Keep stable torrent IDs
+  for download selection even when backend rankings change. Torrent rows have an explicit download action
+  independent of ID presence; missing IDs show a service-version error. Only an explicit trailer action opens
+  YouTube. Preview rebuilds reload the download backend modules alongside the UI to prevent stale responses. Cancel owned searches on Back or season changes.
+  Include the API operation and server explanation in errors such as HTTP 409. Names occupy
+  the left column; seeds and size align on the right (no peers). Preserve the results scroll position on detail
+  refreshes; show season controls in label → − → + order beside Back on this screen, not in the title detail action row. Selecting a
+  result starts a download.
+- Keep credentials out of generated client config. The private backend config is packaged only in the webOS
+  service; preview refuses HTTP access to backend config/seed. Personal packages remain private.
+- Persist title/season links and unique qBittorrent tags atomically in `/media/internal/io.freemytv.torrents.json`
+  (preview: `out/watchlist/torrents.json`). Recover torrent hashes from those tags. Downloads explicitly start,
+  with automatic torrent management off so configured destinations are honored. Never delete torrents/files.
+- Poll tracked downloads at most once a minute, or every five seconds while details are open; retry offline
+  connections after a minute. Completed downloads trigger Plex library scans and forced watchlist refreshes,
+  retried every two minutes until availability changes. Once a title has any available provider, prune its links
+  before contacting qBittorrent and hide progress. Later-season downloads started for an already available show
+  retain their backend link until completion and a newer Plex/watchlist snapshot, while progress stays hidden. Progress is distinct from Plex indexing completion.
+- Background intervals run while the webOS service process is active; they do not guarantee polling after webOS
+  suspends/terminates it. Opening the app resumes polling from durable links. UI polling pauses while hidden.
