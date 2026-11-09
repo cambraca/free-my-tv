@@ -1,6 +1,6 @@
 {
   "id": "io.freemytv",
-  "version": "1.1.17",
+  "version": "1.1.18",
   "vendor": "Free My TV",
   "type": "web",
   "main": "index.html",
@@ -11,5 +11,8 @@
   "resolution": "1920x1080",
   "handlesRelaunch": true,
   "disableBackHistoryAPI": true,
-  "requiredPermissions": ["applications", "applications.launcher"]
+  "requiredPermissions": [
+    "applications",
+    "applications.launcher"
+  ]
 }

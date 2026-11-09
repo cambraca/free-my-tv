@@ -12,10 +12,11 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -24,6 +25,7 @@ import android.graphics.drawable.Drawable;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
+import android.os.Build;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.view.View;
@@ -54,9 +56,13 @@ import java.util.regex.Pattern;
 final class HomeApps {
     private HomeApps() {}
 
-    static final int APP = 0, LIVE_TV = 1, INPUT = 2, ALL_APPS = 3, SETTINGS = 4, ANDROID_SETTINGS = 5;
+    static final int APP = 0, LIVE_TV = 1, INPUT = 2, ALL_APPS = 3, SETTINGS = 4, ANDROID_SETTINGS = 5, DEVICE = 6;
     /** The "HDMI Inputs" button: opens the bottom drawer on the inputs (the home screen handles it). */
     static final int INPUTS = 7;
+    /** The Recent Apps switcher (the home screen opens it). */
+    static final int RECENTS = 8;
+    /** A Home Assistant entity in the drawer (HomeAssistant): OK calls its service, nothing opens. */
+    static final int HOME_ASSISTANT = 9;
     /** Image size of each card (16:9; on screen it shows up to ~330 px wide). */
     static final int TILE_W = 384, TILE_H = 216;
 
@@ -64,40 +70,86 @@ final class HomeApps {
         int kind;
         String key, label, pkg, inputId, number;
         String uri;         // opens this address in the app instead of the app's home (a title's page)
+        Intent intent;      // DEVICE: the TV maker's own screen it opens
         String symbol;      // icon for the shortcuts and special cards
-        Bitmap tile;        // 16:9 card (apps and specials)
+        Bitmap tile;        // 16:9 card (apps and specials): set with setTile
+        BitmapShader tileShader;   // the card's, for its rounded corners (made with the card, never while drawing)
         Bitmap logo;        // colored logo with no background (shelf); null = use the card
         Bitmap logoDark;    // version for a light background (YouTube's white icon), if any
         float logoInk;      // fraction of the logo with ink (thin logos are drawn larger, with the same "weight")
         float logoScale = 1; // size tweak by eye (compact logos need more)
         boolean connected = true;
+        HomeAssistant.Control control;   // HOME_ASSISTANT: the entity it shows and calls
+
+        void setTile(Bitmap b) {
+            tile = b;
+            tileShader = b == null ? null : new BitmapShader(b, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+        }
     }
 
     /**
-     * Apps on the home shelf, in this order, when installed (up to MAX_SHELF): key, name, package, brand color (for
+     * Apps on the home shelf, in this order, when installed (the first FEW_APPS): key, name, package, brand color (for
      * its logo on glass) and how to lift the logo from the app's TV art: "tint" = a white logo takes the art's
      * background color (Prime Video, Globoplay); "play" = the white triangle inside the red button stays white
-     * (YouTube); empty = the art's colors as they are. Last, a visual size tweak for the logo. Edit freely.
+     * (YouTube); "white" = only the white of the art, for a white logo over a busy gradient (Kinopoisk); empty = the
+     * art's colors as they are. Last, a visual size tweak for the logo. Edit freely.
      */
     private static final String[][] SHELF = {
         {"netflix", "Netflix", "com.netflix.ninja", "E50914", "", "1"},
         {"youtube", "YouTube", "com.google.android.youtube.tv", "FF0033", "play", "1"},
+        {"youtube", "YouTube", "com.amazon.firetv.youtube", "FF0033", "play", "1"},
         {"prime", "Prime Video", "com.amazon.amazonvideo.livingroom", "1A98FF", "tint", "0.96"},
+        {"prime", "Prime Video", "com.amazon.firebat", "1A98FF", "tint", "0.96"},
+        {"prime", "Prime Video", "com.amazon.avod", "1A98FF", "tint", "0.96"},
         {"disney", "Disney+", "com.disney.disneyplus", "1838C8", "", "1"},
         {"max", "Max", "com.wbd.stream", "6C3BE0", "", "1.32"},
         {"max", "HBO Max", "com.hbo.hbonow", "6C3BE0", "", "1.32"},
         {"appletv", "Apple TV", "com.apple.atve.androidtv.appletv", "B8BCC6", "", "1.1"},
         {"appletv", "Apple TV", "com.apple.atve.sony.appletv", "B8BCC6", "", "1.1"},   // Sony's own build
+        {"appletv", "Apple TV", "com.apple.atve.amazon.appletv", "B8BCC6", "", "1.1"},
         {"hulu", "Hulu", "com.hulu.livingroomplus", "1CE783", "", "1"},
+        {"hulu", "Hulu", "com.hulu.plus", "1CE783", "", "1"},
         {"paramount", "Paramount+", "com.cbs.ott", "0064FF", "", "1"},
+        {"paramount", "Paramount+", "com.cbs.ca", "0064FF", "", "1"},          // Paramount+ outside the US (a Sony in the UK; Canada)
+        {"now", "NOW", "com.bskyb.nowtv.beta", "1B9C8E", "", "1"},              // UK: Sky's NOW
         {"peacock", "Peacock", "com.peacocktv.peacockandroid", "6E55DC", "", "1"},
+        {"peacock", "Peacock", "com.peacock.peacockfiretv", "6E55DC", "", "1"},
         {"globoplay", "Globoplay", "com.globo.globotv", "FF5A1F", "tint", "1"},
+        {"kinopoisk", "Кинопоиск", "ru.kinopoisk.tv", "FF5500", "white", "1"},
+        {"okko", "Okko", "ru.more.play", "6D43FF", "", "1"},
+        {"premier", "Premier", "gpm.tnt_premier", "FF2D55", "", "1"},
+        {"amediateka", "Амедиатека", "ru.amediateka", "E31E24", "", "1"},
+        {"wink", "Wink", "ru.rt.video.app.tv", "FF5A1F", "", "1"},
         {"spotify", "Spotify", "com.spotify.tv.android", "1DB954", "", "1"},
     };
-    static final int MAX_SHELF = 8;
+    /**
+     * Apps the shelf shows at once (it scrolls for the rest): 8, today's smallest tiles (178 wide in HomeView's 1760 of
+     * content), so a shelf of up to 8 looks as it always did. The built-in list keeps 8, and low-memory TVs hold 8 at
+     * most, without scrolling: every app on the shelf keeps its logo in memory, at two sizes.
+     */
+    private static final int SHELF_VISIBLE = 8, FEW_APPS = 8;
+
+    /** Low memory (TCL's 1 GB models): every MB counts. */
+    static boolean lowRam(Context c) {
+        return c.getSystemService(android.app.ActivityManager.class).isLowRamDevice();
+    }
+
+    static int shelfVisible(Context c) {
+        return lowRam(c) ? FEW_APPS : SHELF_VISIBLE;
+    }
+
+    static int maxShelf(Context c) {
+        return lowRam(c) ? FEW_APPS : Integer.MAX_VALUE;
+    }
+
+    /** An app All Apps leaves out (the TV's own helpers: Safety Guard, T-Solo…): Recent Apps leaves it out too. */
+    static boolean isHidden(String pkg) {
+        return HIDDEN.contains(pkg);
+    }
+
     /** Live TV apps of some brands (the antenna's channels open through the standard Android request first). */
     static final String[] LIVE_TV_APPS = {"com.tcl.tv", "com.google.android.tv", "com.mediatek.wwtv.tvcenter", "com.sony.dtv.tvx",
-            "com.smartdevice.livetv", "com.mediatek.tv.oneworld.tvcenter"};
+            "com.smartdevice.livetv", "com.mediatek.tv.oneworld.tvcenter", "com.amazon.tv.livetv", "com.amazon.mediatek.livetv"};
     /** Kept out of "All Apps" (only hidden, still installed). Add the ones your TV shows that you never use. */
     private static final Set<String> HIDDEN = new HashSet<>(java.util.Arrays.asList(
             "com.google.android.play.games",        // Google Play Games
@@ -116,6 +168,13 @@ final class HomeApps {
             "com.disney.starplus",                  // Star+ (merged into Disney+)
             "com.tcl.exhibit"));                    // TCL: T-Exhibition
 
+    /**
+     * System apps with only a phone launcher entry that still belong in "All Apps". Fire TV's Appstore has no TV banner
+     * (no LEANBACK_LAUNCHER entry), so without this a Fire TV had no way to its app store from this home screen.
+     */
+    private static final Set<String> SYSTEM_SHOWN = new HashSet<>(java.util.Arrays.asList(
+            "com.amazon.venezia"));                 // Amazon Appstore
+
     private static final Map<String, Bitmap> TILES = new HashMap<>();   // key → ready card
     private static final Map<String, Bitmap> LOGOS = new HashMap<>();   // key → colored logo with no background
 
@@ -126,8 +185,9 @@ final class HomeApps {
     static List<Item> shelf(Context c, boolean extract) {
         List<Item> items = new ArrayList<>();
         PackageManager pm = c.getPackageManager();
+        int max = maxShelf(c);
         for (String pkg : shelfPackages(c)) {
-            if (items.size() >= MAX_SHELF) break;
+            if (items.size() >= max) break;
             Intent launch = launchIntent(pm, pkg);
             if (launch == null) continue;
             ResolveInfo ri = pm.resolveActivity(launch, 0);
@@ -139,12 +199,12 @@ final class HomeApps {
                 // An app picked in Settings > Shelf that isn't in SHELF: its own name and TV art.
                 it.key = pkg;
                 it.label = ri != null ? String.valueOf(ri.loadLabel(pm)) : pkg;
-                it.tile = appTile(c, null, pkg, 0);
+                it.setTile(appTile(c, null, pkg, 0));
             } else {
                 it.key = d[0];
                 it.label = d[1];
                 it.logo = shelfLogo(c, d[0], d[2], d[4], extract);
-                if (it.logo == null) it.tile = appTile(c, d[0], d[2], 0xFF000000 | Integer.parseInt(d[3], 16));
+                if (it.logo == null) it.setTile(appTile(c, d[0], d[2], 0xFF000000 | Integer.parseInt(d[3], 16)));
                 if (it.logo != null) it.logoInk = ink(it.logo);
                 it.logoDark = ownLogoCached(c, d[0] + "-dark");
                 it.logoScale = Float.parseFloat(d[5]);
@@ -164,8 +224,14 @@ final class HomeApps {
         List<String> custom = Prefs.shelf();
         if (custom != null) return custom;
         List<String> out = new ArrayList<>();
+        Set<String> keys = new HashSet<>();
         PackageManager pm = c.getPackageManager();
-        for (String[] d : SHELF) if (out.size() < MAX_SHELF && launchIntent(pm, d[2]) != null) out.add(d[2]);
+        for (String[] d : SHELF) {
+            if (out.size() < FEW_APPS && !keys.contains(d[0]) && launchIntent(pm, d[2]) != null) {
+                keys.add(d[0]);
+                out.add(d[2]);
+            }
+        }
         return out;
     }
 
@@ -180,8 +246,79 @@ final class HomeApps {
             if (app[0].equals(c.getPackageName()) || HIDDEN.contains(app[0]) || !seen.add(app[0])) continue;
             more.add(app);
         }
+        // A system app put on the shelf while "Android apps" was on keeps its row after it's turned off, so it can come
+        // off again (and doesn't hold a place toward the limit with no row).
+        for (String pkg : shelfPackages(c)) {
+            Intent launch = launchIntent(pm, pkg);
+            if (launch == null || pkg.equals(c.getPackageName()) || !seen.add(pkg)) continue;
+            ResolveInfo ri = pm.resolveActivity(launch, 0);
+            more.add(new String[] {pkg, ri != null ? String.valueOf(ri.loadLabel(pm)) : pkg});
+        }
         Collections.sort(more, (a, b) -> a[1].toLowerCase(Locale.ROOT).compareTo(b[1].toLowerCase(Locale.ROOT)));
         out.addAll(more);
+        return out;
+    }
+
+    // MARK: - Top buttons (the round ones at the top right)
+
+    static final String TOP_LIVE = "live", TOP_INPUTS = "inputs", TOP_SETTINGS = "settings", TOP_RECENTS = "recents", TOP_STORE = "store";
+    static final List<String> TOP_DEFAULT = Collections.unmodifiableList(java.util.Arrays.asList(TOP_LIVE, TOP_INPUTS, TOP_SETTINGS));
+    /** What can be a top button: the default three, and Recent Apps and App Store for whoever adds them. */
+    static final List<String> TOP_ALL = Collections.unmodifiableList(java.util.Arrays.asList(TOP_LIVE, TOP_INPUTS, TOP_SETTINGS, TOP_RECENTS, TOP_STORE));
+    static final int MAX_TOP = TOP_ALL.size();
+
+    /** The keys of the top buttons, in order (Settings > Top Buttons; by default Live TV, HDMI Inputs, Settings). */
+    static List<String> topButtonKeys() {
+        List<String> saved = Prefs.topButtons();
+        if (saved == null) return TOP_DEFAULT;
+        List<String> keys = new ArrayList<>();
+        for (String key : saved) {
+            if (key.equals(TOP_RECENTS) && Prefs.recents().equals("off")) continue;   // Recent Apps is off: no button either
+            if (TOP_ALL.contains(key) && !keys.contains(key)) keys.add(key);
+        }
+        return keys;
+    }
+
+    /** The top buttons, ready to draw. A null context skips the store until the background app load checks it. */
+    static List<Item> topButtons(Context c) {
+        List<Item> items = new ArrayList<>();
+        for (String key : topButtonKeys()) {
+            Item item = topButton(key);
+            if (TOP_STORE.equals(key)) {
+                item.pkg = c == null ? null : storePackage(c);
+                if (item.pkg == null) continue;   // keep the saved choice, but no dead button on the home screen
+            }
+            items.add(item);
+        }
+        return items;
+    }
+
+    /** Only native stores with a launcher entry; no browser fallback or package installation. */
+    static String storePackage(Context c) {
+        PackageManager pm = c.getPackageManager();
+        String first = HomeMode.AMAZON ? "com.amazon.venezia" : "com.android.vending";
+        String second = HomeMode.AMAZON ? "com.android.vending" : "com.amazon.venezia";
+        if (launchIntent(pm, first) != null) return first;
+        return launchIntent(pm, second) != null ? second : null;
+    }
+
+    private static Item topButton(String key) {
+        switch (key) {
+            case TOP_LIVE: return action(LIVE_TV, TOP_LIVE, Ui.tr("light|Live TV"), "live_tv");
+            case TOP_INPUTS: return action(INPUTS, TOP_INPUTS, Ui.tr("HDMI Inputs"), "hdmi");
+            case TOP_RECENTS: return action(RECENTS, TOP_RECENTS, Ui.tr("Recent Apps"), "recents");
+            case TOP_STORE: return action(APP, TOP_STORE, Ui.tr("App Store"), "store");
+            default: return action(SETTINGS, TOP_SETTINGS, Ui.tr("light|Settings"), "settings");
+        }
+    }
+
+    /** What can go in the top buttons, as {key, name}. */
+    static List<String[]> topCandidates() {
+        List<String[]> out = new ArrayList<>();
+        for (String key : TOP_ALL) {
+            if (key.equals(TOP_RECENTS) && Prefs.recents().equals("off")) continue;   // offered once Recent Apps is on
+            out.add(new String[] {key, topButton(key).label});
+        }
         return out;
     }
 
@@ -205,23 +342,64 @@ final class HomeApps {
         return it;
     }
 
+    /** A Home Assistant tile in the drawer, named by the server (HomeAssistant.items). */
+    static Item homeAssistant(HomeAssistant.Control ctl, String symbol) {
+        Item it = shortcut(HOME_ASSISTANT, "ha:" + ctl.entity, ctl.name, symbol);
+        it.control = ctl;
+        return it;
+    }
+
     /** Icon button (the ones in the corner of the home screen). */
     static Item action(int kind, String key, String label, String symbol) {
         return shortcut(kind, key, label, symbol);
     }
 
     /** Free My TV settings, in the corner of the home screen. */
+    /** The TV's own settings (android.settings.SETTINGS; where nothing answers it, Android TV's settings app). */
+    static Item tvSettings() {
+        return shortcut(ANDROID_SETTINGS, "tv-settings", Ui.tr("TV Settings"), "tv_settings");
+    }
+
     static Item settings() {
         return shortcut(SETTINGS, "settings", Ui.tr("Settings"), "settings");
     }
 
     /** Shortcuts in the bottom drawer. */
-    static List<Item> drawerShortcuts() {
+    static List<Item> drawerShortcuts(Context c) {
         List<Item> items = new ArrayList<>();
         items.add(shortcut(ALL_APPS, "all", Ui.tr("All Apps"), "apps"));
         items.add(shortcut(SETTINGS, "settings", Ui.tr("Home Settings"), "settings"));
         items.add(shortcut(ANDROID_SETTINGS, "tv-settings", Ui.tr("TV Settings"), "tv_settings"));
+        // Android's list of apps (force stop, clear data, uninstall), where TV Settings opens the maker's own menu: a
+        // Philips TPM171E (Android 8) has no Apps there, and its stock home screen was the way to an app's page (#452).
+        String tvSettings = answers(c, new Intent(Settings.ACTION_SETTINGS));
+        Intent apps = new Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS);
+        if (tvSettings != null && !tvSettings.equals(answers(c, apps))) device(c, items, "app-settings", Ui.tr("App Settings"), "apps", apps);
+        if (!Prefs.recents().equals("off")) items.add(shortcut(RECENTS, "recents", Ui.tr("Recent Apps"), "recents"));   // opt-in (Home Settings)
+        // HY300 projectors (Hotack, Allwinner H713): keystone and focus live in the maker's settings app, and the
+        // stock home screen was the only way to its Miracast receiver. Each shows only where the TV has it.
+        // The Amlogic ones (txhd2) carry the HTC app too, but its keystone crashes there (SurfaceFlinger refuses code
+        // 1050): their own is com.softwinner.tcorrection, so that one wins where it's installed.
+        Intent tcorrection = new Intent().setComponent(new ComponentName("com.softwinner.tcorrection",
+                "com.softwinner.tcorrection.projection.ProjectionSettingActivity"));
+        device(c, items, "keystone", Ui.tr("Keystone"), "keystone",
+                c.getPackageManager().resolveActivity(tcorrection, 0) != null ? tcorrection : new Intent("action.htcsettings.prjsettings"));
+        device(c, items, "mirroring", Ui.tr("Screen Mirroring"), "cast",
+                new Intent().setComponent(new ComponentName("com.softwinner.miracastReceiver", "com.softwinner.miracastReceiver.Miracast")));
         return items;
+    }
+
+    private static void device(Context c, List<Item> items, String key, String label, String symbol, Intent intent) {
+        if (c.getPackageManager().resolveActivity(intent, 0) == null) return;
+        Item it = shortcut(DEVICE, key, label, symbol);
+        it.intent = intent;
+        items.add(it);
+    }
+
+    /** The package whose activity answers `intent`, or null. */
+    private static String answers(Context c, Intent intent) {
+        ResolveInfo r = c.getPackageManager().resolveActivity(intent, 0);
+        return r != null ? r.activityInfo.packageName : null;
     }
 
     /** A streaming service's app (the "Watch" button of the featured pick). */
@@ -237,6 +415,13 @@ final class HomeApps {
         it.key = pkg;
         it.pkg = pkg;
         it.label = label;
+        return it;
+    }
+
+    /** An open app as a card of the Recent Apps switcher: its TV art, like All Apps. */
+    static Item recentItem(Context c, String pkg, String label) {
+        Item it = app(pkg, label);
+        it.tile = appTile(c, null, pkg, 0);
         return it;
     }
 
@@ -278,6 +463,8 @@ final class HomeApps {
             return out;
         }
         Collections.sort(list, (a, b) -> a.getId().compareTo(b.getId()));
+        // Allwinner's live TV player (HY300 and HY320 projectors) is the only way to the HDMI input on those boards.
+        boolean allwinner = allwinnerInputs(c);
         Pattern digit = Pattern.compile("(\\d)");
         for (int i = 0; i < list.size(); i++) {
             TvInputInfo info = list.get(i);
@@ -291,7 +478,11 @@ final class HomeApps {
                 state = tim.getInputState(info.getId());
             } catch (RuntimeException ignored) {
             }
-            if (!all && state != TvInputManager.INPUT_STATE_CONNECTED) continue;
+            // An Allwinner projector stays in "connected standby" even with a source on (HY320), and its single port
+            // always works: standby counts as connected there.
+            boolean connected = state == TvInputManager.INPUT_STATE_CONNECTED
+                    || (allwinner && state == TvInputManager.INPUT_STATE_CONNECTED_STANDBY);
+            if (!all && !connected) continue;
             CharSequence custom = null;
             try {
                 custom = info.loadCustomLabel(c);
@@ -299,17 +490,81 @@ final class HomeApps {
             }
             String reported = devices.containsKey(info.getId()) ? devices.get(info.getId()) : "";
             String label = custom != null && custom.length() > 0 ? custom.toString()
-                    : !reported.isEmpty() && state == TvInputManager.INPUT_STATE_CONNECTED ? reported : "HDMI " + number;
-            String symbol = state == TvInputManager.INPUT_STATE_CONNECTED || custom != null
-                    ? deviceSymbol(label) : "hdmi";
+                    : !reported.isEmpty() && connected ? reported : "HDMI " + number;
+            String symbol = connected || custom != null ? deviceSymbol(label) : "hdmi";
             Item it = shortcut(INPUT, "hdmi" + number, label, symbol);
             it.inputId = info.getId();
             it.number = String.valueOf(number);
-            it.connected = state == TvInputManager.INPUT_STATE_CONNECTED;
+            it.connected = connected;
             out.add(it);
         }
         Collections.sort(out, (a, b) -> a.number.compareTo(b.number));
+        // Allwinner's player opens only HDMI 1 (HY300 and HY320: one port, though the board lists three)
+        if (allwinner) out.removeIf(it -> !"1".equals(it.number));
+        // MIUI TV knows three HDMI ports; a board reporting a fourth leaves it with no way to be opened (a Redmi TV
+        // lists HDMI 4 and answers no number for it), so it isn't shown.
+        else if (xiaomiInputs(c)) out.removeIf(it -> !xiaomiPort(it));
         return out;
+    }
+
+    /** Allwinner's live TV player (HY300 and HY320 projectors), the stock home screen's way to HDMI. */
+    private static final ComponentName ALLWINNER_TV = new ComponentName("com.softwinner.awlivetv", "com.softwinner.awlivetv.MainActivity");
+    /** Xiaomi's own source player (MIUI TV, the Chinese firmware): it takes the port as a number of its own. */
+    private static final ComponentName XIAOMI_SOURCES = new ComponentName("com.xiaomi.mitv.tvplayer", "com.xiaomi.mitv.tvplayer.ExternalSourceActivity");
+    private static final String XIAOMI_SOURCES_ACTION = "com.xiaomi.mitv.tvplayer.EXTSRC_PLAY";
+    /** MIUI TV's numbers for HDMI 1 to 3 (VGA is 0 and AV 2). A number it doesn't know drops the TV to no source at all. */
+    private static final int[] XIAOMI_HDMI = {23, 24, 25};
+
+    /** Whether the activity is really there: Intent.resolveActivity hands an explicit component back without looking. */
+    private static boolean exists(Context c, ComponentName component) {
+        return new Intent().setComponent(component).resolveActivityInfo(c.getPackageManager(), 0) != null;
+    }
+
+    /** No app opens a passthrough input, so only the maker's own player can reach the TV's inputs. */
+    private static boolean noPassthrough(Context c) {
+        Intent view = new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput("x"));
+        return view.resolveActivity(c.getPackageManager()) == null;
+    }
+
+    /** No app opens a passthrough input, but Allwinner's player is there. */
+    private static boolean allwinnerInputs(Context c) {
+        return noPassthrough(c) && exists(c, ALLWINNER_TV);
+    }
+
+    /** No app opens a passthrough input, but Xiaomi's source player is there (MIUI TV, a Redmi TV on Android 9 tested). */
+    private static boolean xiaomiInputs(Context c) {
+        return noPassthrough(c) && exists(c, XIAOMI_SOURCES);
+    }
+
+    /** The port's number, from the digit in its name, or 0 when it had none. */
+    private static int port(Item it) {
+        try {
+            return Integer.parseInt(it.number);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /** A port MIUI TV has a number for: the others can't be opened at all, so they aren't shown. */
+    private static boolean xiaomiPort(Item it) {
+        return port(it) >= 1 && port(it) <= XIAOMI_HDMI.length;
+    }
+
+    /**
+     * How to open an HDMI input: the standard passthrough request, or, where no app answers it, the maker's own
+     * player. Allwinner's takes the port in "input_source" ("HDMI1"); Xiaomi's takes it as its own "input" number.
+     */
+    private static Intent inputIntent(Context c, Item it) {
+        if (allwinnerInputs(c)) {
+            // Its own player switches the port when the intent names it ("HDMI1"), as its source picker does. The
+            // HY320 needs it; the HY300 ignores it and opens its only port anyway.
+            return new Intent().setComponent(ALLWINNER_TV).putExtra("input_source", "HDMI" + it.number);
+        }
+        if (xiaomiInputs(c) && xiaomiPort(it)) {
+            return new Intent(XIAOMI_SOURCES_ACTION).setComponent(XIAOMI_SOURCES)
+                    .putExtra("input", XIAOMI_HDMI[port(it) - 1]);
+        }
+        return new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(it.inputId));
     }
 
     /** Words in a device's name, by the icon they pick: a game console, a streaming box, a sound system, a TV box. */
@@ -349,7 +604,7 @@ final class HomeApps {
             it.pkg = pkg;
             it.key = pkg;
             it.label = app[1];
-            it.tile = appTile(c, null, pkg, 0);
+            it.setTile(appTile(c, null, pkg, 0));
             items.add(it);
         }
         Collections.sort(items, (a, b) -> a.label.toLowerCase(Locale.ROOT).compareTo(b.label.toLowerCase(Locale.ROOT)));
@@ -362,13 +617,19 @@ final class HomeApps {
 
     private static Item special(Context c, int kind, String key, String label, String symbol) {
         Item it = shortcut(kind, key, label, symbol);
-        it.tile = symbolTile(c, key, symbol);
+        it.setTile(symbolTile(c, key, symbol));
         return it;
     }
 
     /** Opens the item with the system zoom transition growing out of the card (the app starts opening right away). */
     static boolean open(Activity a, Item it, View from, int x, int y, int w, int h) {
-        Intent intent, plain = null;   // plain: the app's own home, when it won't take the title's address
+        return open(a, it, ActivityOptions.makeScaleUpAnimation(from, x, y, Math.max(w, 1), Math.max(h, 1)).toBundle());
+    }
+
+    /** Opens the item; `options` for the transition, or null (the screensaver has no card to grow out of). */
+    static boolean open(Context a, Item it, android.os.Bundle options) {
+        // plain: tried when `intent` finds nothing (the app's own home, when it won't take the title's address)
+        Intent intent, plain = null;
         switch (it.kind) {
             case APP:
                 intent = launchIntent(a.getPackageManager(), it.pkg);
@@ -376,19 +637,32 @@ final class HomeApps {
                 if (plain != null) plain.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
                 if (intent != null && it.uri != null) {
                     intent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(it.uri)).addCategory(Intent.CATEGORY_BROWSABLE).setPackage(it.pkg);
+                    // Netflix ignores the title's address when it is already open or when no source is named: it opens its own home.
+                    // Like the TV launchers do, name its activity and the source (30) and start it in a fresh task.
+                    if ("com.netflix.ninja".equals(it.pkg) && plain != null && plain.getComponent() != null) {
+                        intent.setComponent(plain.getComponent()).putExtra("source", "30").addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    }
                 }
                 break;
             case LIVE_TV:
                 intent = liveTv(a);
                 break;
             case INPUT:
-                intent = new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(it.inputId));
+                if (HomeMode.AMAZON && fireInput(a, it)) return true;
+                intent = inputIntent(a, it);
                 break;
             case SETTINGS:
                 intent = new Intent().setComponent(new ComponentName(a, SettingsActivity.class));
                 break;
             case ANDROID_SETTINGS:
                 intent = new Intent(Settings.ACTION_SETTINGS);
+                // Where nothing answers it, Android TV's own settings by name: on the HY300 Pro+ the stock home
+                // (com.htc.magcubicos) is the one that does, and Free My TV mode turns it off (#379).
+                plain = new Intent().setComponent(new ComponentName("com.android.tv.settings", "com.android.tv.settings.MainSettings"));
+                break;
+            case DEVICE:
+                // A fresh task: else Back walks through whatever the maker's settings app had open before
+                intent = new Intent(it.intent).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 break;
             default:
                 return false;
@@ -396,7 +670,7 @@ final class HomeApps {
         if (intent == null) return false;
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
-            a.startActivity(intent, ActivityOptions.makeScaleUpAnimation(from, x, y, Math.max(w, 1), Math.max(h, 1)).toBundle());
+            a.startActivity(intent, options);
             return true;
         } catch (ActivityNotFoundException | SecurityException e) {
             AppLog.w("couldn't open " + it.label + ": " + e.getMessage());
@@ -412,11 +686,52 @@ final class HomeApps {
     }
 
     /**
+     * Fire TV (a TV with Fire OS built in): an HDMI input through Amazon's own input switch, as its home screen does.
+     * The standard request goes to Vewd's HbbTV player or to Amazon's Live TV, which both play the antenna's last
+     * channel (an app's, like RaiPlay's) instead, and Amazon's input player wants a permission only Amazon's apps have.
+     * The switch usually takes the port's hardware number: HW2 is HDMI 1. On the TCL AFTDEC012E, HDMI 4 is
+     * HW5 but Amazon's own menu sends inputType 10; 5 waits for input data and times out.
+     */
+    private static final Pattern HW = Pattern.compile("/HW(\\d+)$");
+
+    private static boolean fireInput(Context c, Item it) {
+        Matcher m = HW.matcher(it.inputId);
+        if (!m.find()) return false;
+        Intent sw = new Intent().setComponent(new ComponentName("com.amazon.tv.inputpreference.service",
+                "com.amazon.tv.inputpreference.service.KaminoInputSwitchService"));
+        if (c.getPackageManager().resolveService(sw, 0) == null) return false;
+        try {
+            int hardware = Integer.parseInt(m.group(1));
+            int inputType = "AFTDEC012E".equalsIgnoreCase(Build.MODEL) && hardware == 5 ? 10 : hardware;
+            if (c.startService(sw.putExtra("inputType", inputType)) == null) return false;
+            AppLog.w("Fire TV input: HW" + hardware + " (type " + inputType + ") for " + it.label);
+            return true;
+        } catch (RuntimeException e) {
+            AppLog.w("Amazon's input switch: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Live TV: tune the antenna input directly. MediaTek TV Center otherwise restores the last source used, which can
      * be HDMI, so its explicit activity receives the tuner URI. Other TV apps keep the standard channel-list request.
      */
     static Intent liveTv(Context c) {
         PackageManager pm = c.getPackageManager();
+        // Fire TV: the antenna (digital terrestrial) entry of Amazon's Live TV, which plays the antenna's channels or
+        // opens the channel scan when there are none yet. The channels request would also offer Vewd's HbbTV player,
+        // and Live TV on its own plays the last channel, which can be an app's (RaiPlay's).
+        if (HomeMode.AMAZON) {
+            ComponentName dtt = new ComponentName("com.amazon.tv.livetv", "com.amazon.tv.livetv.DttIconWrapperActivity");
+            // exists(), not resolveActivity: that hands an explicit component back without looking (the sticks have none)
+            if (exists(c, dtt)) return new Intent().setComponent(dtt);
+        }
+        // Sony: its TV app (the launcher tile's) knows the last input and channel. A tuner's channel list can be an empty
+        // one: a BRAVIA lists DvbOpv1 (the CI+ operator input) beside the satellite and antenna ones (#340).
+        if (RemoteKeys.SONY) {
+            Intent sony = launchIntent(pm, "com.sony.dtv.tvx");
+            if (sony != null) return sony;
+        }
         // MediaTek OneWorld TV Center (KTC/NextStar) has one input per tuner mode (antenna, cable, satellite): tuning one
         // switches the TV to that mode and hides the other channel lists, so it opens as it is, on its own last channel.
         Intent oneWorld = launchIntent(pm, "com.mediatek.tv.oneworld.tvcenter");
@@ -446,22 +761,46 @@ final class HomeApps {
     static String tunerInput(Context c) {
         TvInputManager tim = (TvInputManager) c.getSystemService(Context.TV_INPUT_SERVICE);
         if (tim == null) return null;
-        String system = null, fallback = null;
+        String hardware = null, system = null, fallback = null;
         try {
             for (TvInputInfo info : tim.getTvInputList()) {
                 if (info.getType() != TvInputInfo.TYPE_TUNER || info.isPassthroughInput()) continue;
                 if (info.getServiceInfo() != null && info.getServiceInfo().applicationInfo != null
                         && (info.getServiceInfo().applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0) {
-                    if (info.getId().contains("/HW")) return info.getId();
+                    // Several hardware tuners (MediaTek: Tuner, Cable, Analog): digital antenna first, analog last.
+                    // Haier H32S80EFX lists AnalogInputService/HW1 first, which opens on no channels in DVB-T2 countries;
+                    // a Cecotec lists two TunerInputService ones, HW1 (analog) first.
+                    if (info.getId().contains("/HW") && (hardware == null || tunerRank(info.getId()) < tunerRank(hardware))) {
+                        hardware = info.getId();
+                    }
                     if (system == null) system = info.getId();
                 }
                 if (fallback == null) fallback = info.getId();
             }
         } catch (RuntimeException ignored) {
         }
-        return system != null ? system : fallback;
+        return hardware != null ? hardware : system != null ? system : fallback;
     }
 
+    /**
+     * Live TV's tuner: the digital antenna first, then cable, then analog, by the input's name (Haier H32S80EFX's
+     * Tuner/Cable/AnalogInputService, #254); between inputs of one name, the lowest hardware number (a Cecotec on a
+     * Vestel base: TunerInputService/HW0 is the antenna and HW1 analog, listed first, #312). "atv" only in the
+     * service's class name (Amlogic's ATVInputService), so a package with it in its name doesn't count as analog.
+     */
+    private static int tunerRank(String id) {
+        String s = id.toLowerCase(Locale.ROOT), cls = s.substring(Math.max(0, s.indexOf('/')));   // the service's class
+        int kind = s.contains("analog") || cls.contains(".atv") ? 2 : s.contains("cable") ? 1 : 0;
+        Matcher m = HW.matcher(id);
+        int hw = m.find() && m.group(1).length() <= 3 ? Integer.parseInt(m.group(1)) : 999;
+        return kind * 1000 + hw;
+    }
+
+    /**
+     * The apps a TV can start: its TV apps (Leanback) first, then the phone ones (projectors and AOSP boxes). The
+     * system apps only come with "Android apps" on; off keeps the list as it always was, with the few system apps a TV
+     * needs there (SYSTEM_SHOWN).
+     */
     static List<String[]> launchable(Context c) {
         PackageManager pm = c.getPackageManager();
         List<String[]> out = new ArrayList<>();
@@ -471,10 +810,14 @@ final class HomeApps {
             String pkg = ri.activityInfo.packageName;
             if (seen.add(pkg)) out.add(new String[] {pkg, String.valueOf(ri.loadLabel(pm))});
         }
+        boolean androidApps = Prefs.androidApps();
         Intent phone = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         for (ResolveInfo ri : pm.queryIntentActivities(phone, 0)) {
             String pkg = ri.activityInfo.packageName;
-            if ((ri.activityInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0 || !seen.add(pkg)) continue;
+            boolean systemApp = (ri.activityInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+            // Even with "Android apps" on, never a factory or service menu (one OK there can reset the TV).
+            if (systemApp && !SYSTEM_SHOWN.contains(pkg) && (!androidApps || HomeMode.factoryMenu(pkg))) continue;
+            if (!seen.add(pkg)) continue;
             out.add(new String[] {pkg, String.valueOf(ri.loadLabel(pm))});
         }
         return out;
@@ -488,7 +831,7 @@ final class HomeApps {
     // MARK: - Colored logos (shelf)
 
     /** Bump when the way logos are lifted changes (the ones saved on disk are redone). */
-    private static final int LOGO_VERSION = 2;
+    private static final int LOGO_VERSION = 3;
 
     private static Bitmap shelfLogo(Context c, String key, String pkg, String mode, boolean extract) {
         synchronized (LOGOS) {
@@ -503,7 +846,7 @@ final class HomeApps {
             } else if (!extract) {
                 return null;
             } else {
-                logo = bannerLogo(c, pkg, mode.equals("tint"), mode.equals("play"));
+                logo = bannerLogo(c, pkg, mode.equals("tint"), mode.equals("play"), mode.equals("white"));
                 saveLogo(logo, file, none);
             }
         }
@@ -558,18 +901,22 @@ final class HomeApps {
     /**
      * Logo lifted from the app's TV art: the background is removed (estimated from the edges, gradients are fine), the
      * brand colors stay and black turns white (the card is dark). With `tint`, a white logo on a colored background
-     * takes the background's color; with `holes`, holes inside colored shapes (the play triangle) turn white. The
-     * edges are "decontaminated" (no halo from the background).
+     * takes the background's color; with `holes`, holes inside colored shapes (the play triangle) turn white; with
+     * `white`, only what is white is kept (anything colored or dark is background). The edges are "decontaminated" (no
+     * halo from the background).
      */
-    private static Bitmap bannerLogo(Context c, String pkg, boolean tint, boolean holes) {
+    private static Bitmap bannerLogo(Context c, String pkg, boolean tint, boolean holes, boolean white) {
         Drawable d = bannerDrawable(c, pkg);
         if (d == null) return null;
         final int w = 768, h = 432;
-        Bitmap src = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(src);
+        // The art at its own resolution, then filtered down: the lifting below works at 768×432.
+        float k = detail(d, w, h);
+        Bitmap big = Bitmap.createBitmap(Math.round(w * k), Math.round(h * k), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(big);
         canvas.drawColor(0xFF15161C);
-        d.setBounds(0, 0, w, h);
+        d.setBounds(0, 0, big.getWidth(), big.getHeight());
         d.draw(canvas);
+        Bitmap src = shrink(big, w, h);
         int[] px = new int[w * h];
         src.getPixels(px, 0, w, 0, 0, w, h);
         src.recycle();
@@ -596,33 +943,49 @@ final class HomeApps {
         float[] mean = new float[3];
         for (int i = 0; i < 3; i++) mean[i] = (p00[i] + p10[i] + p01[i] + p11[i] + top[w / 2][i] + bottom[w / 2][i] + left[h / 2][i] + right[h / 2][i]) / 8;
         float bgLum = lum(mean), bgSat = sat(mean);
-        int[] out = new int[w * h];
+        // Distance of each pixel from the background, then the largest one within 2 px: the ink beside an edge pixel.
+        float[] dist = new float[w * h], near = new float[w * h], tmp = new float[w * h];
         float[] bg = new float[3], col = new float[3];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                background(bg, x, y, w, h, top, bottom, left, right);
+                dist[y * w + x] = distance(px[y * w + x], bg);
+            }
+        }
+        maxFilter(dist, tmp, w, h, 2, true);
+        maxFilter(tmp, near, w, h, 2, false);
+        int[] out = new int[w * h];
         int opaque = 0;
         for (int y = 0; y < h; y++) {
-            float v = (float) y / (h - 1);
             for (int x = 0; x < w; x++) {
-                float u = (float) x / (w - 1);
-                for (int i = 0; i < 3; i++) {
-                    bg[i] = (1 - v) * top[x][i] + v * bottom[x][i] + (1 - u) * left[y][i] + u * right[y][i]
-                            - ((1 - u) * (1 - v) * p00[i] + u * (1 - v) * p10[i] + (1 - u) * v * p01[i] + u * v * p11[i]);
-                }
-                int p = px[y * w + x];
+                int idx = y * w + x;
+                int p = px[idx];
                 col[0] = ((p >> 16) & 255) / 255f;
                 col[1] = ((p >> 8) & 255) / 255f;
                 col[2] = (p & 255) / 255f;
-                float dist = (float) Math.sqrt(((col[0] - bg[0]) * (col[0] - bg[0]) + (col[1] - bg[1]) * (col[1] - bg[1])
-                        + (col[2] - bg[2]) * (col[2] - bg[2])) / 3);
-                float a = smoothstep(0.07f, 0.22f, dist);
-                if (a <= 0.004f) continue;
-                for (int i = 0; i < 3; i++) col[i] = clamp((col[i] - (1 - a) * bg[i]) / a);   // no background halo
-                float l = lum(col), s = sat(col);
-                if (bgLum > 0.6f && l < 0.42f && s < 0.3f) {
-                    col[0] = col[1] = col[2] = 1f;                  // black text on a light background → white
-                } else if (tint && bgLum <= 0.6f && bgLum > 0.1f && bgSat > 0.35f && l > 0.7f && s < 0.25f) {
-                    vivid(bg, col);                                 // white logo on brand color → that color, vivid
+                float a;
+                if (white) {
+                    // Only what is white is ink: on a busy gradient the distance from the background says nothing.
+                    a = smoothstep(0.55f, 0.85f, lum(col)) * (1 - smoothstep(0.12f, 0.3f, sat(col)));
+                    if (a <= 0.004f) continue;
+                    col[0] = col[1] = col[2] = 1f;
+                } else {
+                    // Is there ink here (the old thresholds, on the nearby ink), and how much of this pixel it covers
+                    // (its distance against that ink's): solid parts stay opaque, edges keep their anti-aliasing.
+                    float gate = smoothstep(0.07f, 0.22f, near[idx]);
+                    if (gate <= 0.004f) continue;
+                    a = gate * clamp((dist[idx] - 0.04f) / (0.85f * (near[idx] - 0.04f)));
+                    if (a <= 0.004f) continue;
+                    background(bg, x, y, w, h, top, bottom, left, right);
+                    for (int i = 0; i < 3; i++) col[i] = clamp((col[i] - (1 - a) * bg[i]) / a);   // no background halo
+                    float l = lum(col), s = sat(col);
+                    if (bgLum > 0.6f && l < 0.42f && s < 0.3f) {
+                        col[0] = col[1] = col[2] = 1f;                  // black text on a light background → white
+                    } else if (tint && bgLum <= 0.6f && bgLum > 0.1f && bgSat > 0.35f && l > 0.7f && s < 0.25f) {
+                        vivid(bg, col);                                 // white logo on brand color → that color, vivid
+                    }
                 }
-                out[y * w + x] = (Math.round(a * 255) << 24) | (Math.round(col[0] * 255) << 16) | (Math.round(col[1] * 255) << 8) | Math.round(col[2] * 255);
+                out[idx] = (Math.round(a * 255) << 24) | (Math.round(col[0] * 255) << 16) | (Math.round(col[1] * 255) << 8) | Math.round(col[2] * 255);
                 if (a > 0.5f) opaque++;
             }
         }
@@ -652,6 +1015,36 @@ final class HomeApps {
             return pm.getApplicationBanner(pkg);
         } catch (PackageManager.NameNotFoundException | RuntimeException e) {
             return null;
+        }
+    }
+
+    /** The background at (x, y): the patch spanning the four smoothed edge profiles (gradients are fine). */
+    private static void background(float[] bg, int x, int y, int w, int h, float[][] top, float[][] bottom,
+                                   float[][] left, float[][] right) {
+        float u = (float) x / (w - 1), v = (float) y / (h - 1);
+        float[] p00 = top[0], p10 = top[w - 1], p01 = bottom[0], p11 = bottom[w - 1];
+        for (int i = 0; i < 3; i++) {
+            bg[i] = (1 - v) * top[x][i] + v * bottom[x][i] + (1 - u) * left[y][i] + u * right[y][i]
+                    - ((1 - u) * (1 - v) * p00[i] + u * (1 - v) * p10[i] + (1 - u) * v * p01[i] + u * v * p11[i]);
+        }
+    }
+
+    /** Color distance (0 to 1, RMS of the channels) between a pixel and the background. */
+    private static float distance(int p, float[] bg) {
+        float r = ((p >> 16) & 255) / 255f - bg[0], g = ((p >> 8) & 255) / 255f - bg[1], b = (p & 255) / 255f - bg[2];
+        return (float) Math.sqrt((r * r + g * g + b * b) / 3);
+    }
+
+    /** Largest value within r in one direction. */
+    private static void maxFilter(float[] in, float[] out, int w, int h, int r, boolean horizontal) {
+        int n = horizontal ? w : h, lines = horizontal ? h : w, step = horizontal ? 1 : w, lineStep = horizontal ? w : 1;
+        for (int line = 0; line < lines; line++) {
+            int base = line * lineStep;
+            for (int i = 0; i < n; i++) {
+                float m = 0;
+                for (int j = Math.max(0, i - r); j <= Math.min(n - 1, i + r); j++) m = Math.max(m, in[base + j * step]);
+                out[base + i * step] = m;
+            }
         }
     }
 
@@ -796,18 +1189,18 @@ final class HomeApps {
         } catch (PackageManager.NameNotFoundException | RuntimeException ignored) {
         }
         if (d == null) return null;
-        Bitmap b = Bitmap.createBitmap(TILE_W, TILE_H, Bitmap.Config.ARGB_8888);
+        float k = detail(d, TILE_W, TILE_H);
+        int w = Math.round(TILE_W * k), h = Math.round(TILE_H * k);
+        Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(b);
         canvas.drawColor(0xFF15161C);   // banners with transparency sit on a dark background
-        d.setBounds(0, 0, TILE_W, TILE_H);
+        d.setBounds(0, 0, w, h);
         d.draw(canvas);
-        return b;
+        return shrink(b, TILE_W, TILE_H);
     }
 
     /** No banner: the app's icon (in its proper shape, with some margin) on a dark card. */
     private static Bitmap iconTile(Context c, String pkg) {
-        Bitmap b = darkTile();
-        Canvas canvas = new Canvas(b);
         Drawable icon = null;
         try {
             PackageManager pm = c.getPackageManager();
@@ -821,36 +1214,67 @@ final class HomeApps {
             if (icon == null) icon = pm.getApplicationIcon(ai);
         } catch (PackageManager.NameNotFoundException ignored) {
         }
-        if (icon == null) return b;
-        int size = Math.round(TILE_H * 0.56f);
-        float left = (TILE_W - size) / 2f, top = (TILE_H - size) / 2f;
-        if (icon instanceof AdaptiveIconDrawable) {
-            // Adaptive icon: the layers clipped to a squircle, like an Apple icon.
+        if (icon == null) return darkTile(TILE_W, TILE_H);
+        boolean adaptive = icon instanceof AdaptiveIconDrawable;
+        // Drawn at the icon's own resolution (the whole tile, so the squircle's edge is smooth too), then filtered down.
+        float drawn = TILE_H * (adaptive ? 0.56f * 1.5f : 0.46f);
+        float k = detail(icon, drawn, drawn);
+        int tw = Math.round(TILE_W * k), th = Math.round(TILE_H * k);
+        Bitmap b = darkTile(tw, th);
+        Canvas canvas = new Canvas(b);
+        int size = Math.round(th * 0.56f);
+        float left = (tw - size) / 2f, top = (th - size) / 2f;
+        if (adaptive) {
+            // Adaptive icon: the layers in a squircle, like an Apple icon. Drawn apart, then filling an anti-aliased
+            // rounded rectangle (clipPath leaves stair-stepped corners).
             AdaptiveIconDrawable a = (AdaptiveIconDrawable) icon;
-            Path clip = new Path();
-            clip.addRoundRect(new RectF(left, top, left + size, top + size), size * 0.2237f, size * 0.2237f, Path.Direction.CW);
-            canvas.save();
-            canvas.clipPath(clip);
+            Bitmap layers = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            Canvas lc = new Canvas(layers);
             int pad = size / 4;
             for (Drawable layer : new Drawable[] {a.getBackground(), a.getForeground()}) {
                 if (layer == null) continue;
-                layer.setBounds(Math.round(left) - pad, Math.round(top) - pad, Math.round(left) + size + pad, Math.round(top) + size + pad);
-                layer.draw(canvas);
+                layer.setBounds(-pad, -pad, size + pad, size + pad);
+                layer.draw(lc);
             }
-            canvas.restore();
+            int x = Math.round(left), y = Math.round(top);
+            BitmapShader shader = new BitmapShader(layers, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+            Matrix m = new Matrix();
+            m.setTranslate(x, y);
+            shader.setLocalMatrix(m);
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setShader(shader);
+            canvas.drawRoundRect(x, y, x + size, y + size, size * 0.2237f, size * 0.2237f, p);
         } else {
             // Legacy icon (a free-form drawing with transparency): smaller, no frame.
-            int s = Math.round(TILE_H * 0.46f);
-            icon.setBounds((TILE_W - s) / 2, (TILE_H - s) / 2, (TILE_W + s) / 2, (TILE_H + s) / 2);
+            int s = Math.round(th * 0.46f);
+            icon.setBounds((tw - s) / 2, (th - s) / 2, (tw + s) / 2, (th + s) / 2);
             icon.draw(canvas);
         }
-        return b;
+        return shrink(b, TILE_W, TILE_H);
+    }
+
+    /**
+     * How much bigger than w × h to draw d so it's near its own resolution (vectors: 2×), at most 2×: after an update
+     * every tile is made again, some on the UI thread.
+     */
+    private static float detail(Drawable d, float w, float h) {
+        int iw = d.getIntrinsicWidth(), ih = d.getIntrinsicHeight();
+        float k = iw > 0 && ih > 0 ? Math.max(iw / w, ih / h) : 2f;
+        return Math.max(1f, Math.min(2f, k));
+    }
+
+    /** Filtered down to w × h (Ui.downscale); the big one is recycled. */
+    private static Bitmap shrink(Bitmap big, int w, int h) {
+        Bitmap out = Ui.downscale(big, w, h);
+        if (out != big) big.recycle();
+        return out;
     }
 
     /** Settings and the like: the icon in white on a dark card. */
     private static synchronized Bitmap symbolTile(Context c, String key, String symbol) {
         if (TILES.containsKey(key)) return TILES.get(key);
-        Bitmap b = darkTile();
+        Bitmap b = darkTile(TILE_W, TILE_H);
+        Symbols.warm(c, symbol, TILE_H * 0.36f);
         Symbols.draw(c, new Canvas(b), symbol, TILE_W / 2f, TILE_H / 2f, TILE_H * 0.36f, 0xF2FFFFFF);
         b.setHasMipMap(true);
         TILES.put(key, b);
@@ -859,7 +1283,7 @@ final class HomeApps {
 
     /** The official logo (no background) on dark glass with a faint brand tint coming from below. */
     private static Bitmap logoTile(Bitmap logo, int brand) {
-        Bitmap b = darkTile();
+        Bitmap b = darkTile(TILE_W, TILE_H);
         Canvas canvas = new Canvas(b);
         Paint glow = new Paint();
         glow.setShader(new RadialGradient(TILE_W / 2f, TILE_H * 1.15f, TILE_W * 0.75f, Ui.alpha(brand, 0.38f), 0x00000000, Shader.TileMode.CLAMP));
@@ -867,17 +1291,19 @@ final class HomeApps {
         boolean wide = logo.getWidth() > logo.getHeight() * 1.35f;
         float maxW = TILE_W * (wide ? 0.62f : 0.4f), maxH = TILE_H * (wide ? 0.42f : 0.56f);
         float scale = Math.min(maxW / logo.getWidth(), maxH / logo.getHeight());
-        float w = logo.getWidth() * scale, h = logo.getHeight() * scale;
-        canvas.drawBitmap(logo, null, new RectF((TILE_W - w) / 2, (TILE_H - h) / 2, (TILE_W + w) / 2, (TILE_H + h) / 2),
-                new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+        // Filtered down to the exact size first, then drawn pixel for pixel.
+        Bitmap small = Ui.downscale(logo, Math.round(logo.getWidth() * scale), Math.round(logo.getHeight() * scale));
+        canvas.drawBitmap(small, Math.round((TILE_W - small.getWidth()) / 2f), Math.round((TILE_H - small.getHeight()) / 2f),
+                new Paint(Paint.FILTER_BITMAP_FLAG));
+        if (small != logo) small.recycle();
         return b;
     }
 
-    private static Bitmap darkTile() {
-        Bitmap b = Bitmap.createBitmap(TILE_W, TILE_H, Bitmap.Config.ARGB_8888);
+    private static Bitmap darkTile(int w, int h) {
+        Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         Paint bg = new Paint();
-        bg.setShader(new LinearGradient(0, 0, 0, TILE_H, 0xFF2B2E3A, 0xFF17191F, Shader.TileMode.CLAMP));
-        new Canvas(b).drawRect(0, 0, TILE_W, TILE_H, bg);
+        bg.setShader(new LinearGradient(0, 0, 0, h, 0xFF2B2E3A, 0xFF17191F, Shader.TileMode.CLAMP));
+        new Canvas(b).drawRect(0, 0, w, h, bg);
         return b;
     }
 

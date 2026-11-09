@@ -637,6 +637,7 @@
   }
 
   function tvSettings() {
+    if (TV.canOpenSettings === false) { toast(tr('Use o botão de ajustes do controle.', 'Use the remote’s Settings button.', 'Usa el botón de ajustes del mando.')); return; }
     TV.settings(function (ok) {
       if (!ok) toast(tr('Não deu para abrir os Ajustes da TV', "Couldn't open TV Settings", 'No se pudieron abrir los Ajustes del TV'));
     });
@@ -1141,6 +1142,8 @@
     if (st.zone === Z.SETTINGS) renderSettings();
     updateFocus();
   }
+
+  TV.holdScreenSaver(function () { return !sheetOpen() && Data.showcase().length > 0; });
 
   var appsAt = 0;
   function loadApps(done) {

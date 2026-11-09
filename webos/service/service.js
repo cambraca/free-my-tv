@@ -92,3 +92,5 @@ service.register('openPlex', function (message) {
   if (loading) waiting.push(respond);
   else respond();
 });
+
+require('./remote-apps')(service);

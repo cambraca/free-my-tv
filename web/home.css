@@ -539,3 +539,13 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* The Magic Remote's pointer: no text selection, no outlines. */
 * { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+
+/* Tizen 2 and 1 GB TVs (see tv.js): no shadows or animations; their GPUs can't keep up while the focus moves. */
+.lite * { box-shadow: none !important; -webkit-transition: none !important; transition: none !important; }
+
+/* Samsungs up to 2 GB (see tv.js): the parts that move lose their soft shadows, which the TV repainted on every frame of
+   a move, and what slides is a layer from the start, so a move starts at once. */
+.flat .tab, .flat .card .img, .flat .tile, .flat .key { box-shadow: none !important; }
+.flat .cell.focus .face { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.4) !important; }
+.flat #home, .flat #drawer, .flat #cards, .flat .card, .flat #tiles, .flat .tile { will-change: transform; }
+.flat #top { will-change: opacity; }

@@ -36,7 +36,7 @@ var Prefs = (function () {
     version: 0,
     language: function () { return pick('language', CONFIG.language || 'auto'); },
     temperature: function () { return pick('temperature', CONFIG.temperature || 'auto'); },
-    theme: function () { return pick('theme', 'auto'); },
+    theme: function () { return pick('theme', CONFIG.theme || 'auto'); },
     weather: function () { return pick('weather', true); },
     tab: function () { return Math.max(0, Math.min(4, Math.floor(Number(pick('tab', 0)) || 0))); },
     shelf: function () { return pick('shelf', null); },

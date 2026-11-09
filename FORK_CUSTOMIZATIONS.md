@@ -458,6 +458,24 @@ The first upstream merge needed these specific combinations; future merges must 
 - Keep this document and its `AGENTS.md` link; an upstream README or guide describing quotes, inputs, generic
   trending picks, or opening preview files directly is not permission to restore those behaviors here.
 
+### Upstream merge of 2026-11-08 (fork 1.1.18)
+
+- Retain upstream Android features, remote/platform fixes, recovery changes, and translations. Native Home Settings
+  includes Forecast, Now Playing, optional Home Assistant, keys, and Updates with their current indices; crypto rows
+  and their unused catalogue strings stay removed.
+- Upstream's web UI additions that conflict with the fixed six-row Settings menu, three cards, watchlist source,
+  compact weather/shelf, and manual slideshow remain replaced by the fork implementations. Keep the inline
+  `tr(pt, en, es)` API and its existing hand translations; the catalogue extractor skips these legacy calls.
+- Keep upstream low-memory `lite`/`flat` rendering, Samsung DIAL/Smart Hub launch fixes and app filtering,
+  webOS HD packaging, and locally bundled app discovery. MUBI remains in known-app discovery.
+- The origin-refused webOS SSAP fallback is packaged as `webos/service/remote-apps.js` and registered on the existing
+  `io.freemytv.watchlist/ssap` service. Do not replace the watchlist service with upstream's standalone service or
+  point the client at an unpackaged `.service` endpoint. The fallback accepts only app-list requests.
+- Keep TV Settings visible on the web launcher. On older Samsung versions where opening settings can freeze the
+  TV, explain that the remote's Settings button is required instead of issuing that launch.
+- Retain the existing web configuration shape/cache identity; upstream's Android Plex URL, Trakt, Immich, and Home
+  Assistant configuration does not replace this fork's web Plex host/port or watchlist pipeline.
+
 ### Validation checklist
 
 1. Inspect the complete resolved diff, including automatically merged lines adjacent to conflicts. Check for
