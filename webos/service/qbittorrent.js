@@ -167,8 +167,10 @@ module.exports = function (config, filename, getSnapshot, refresh) {
     jobs[key] = {imdbId: payload.imdbId, season: p.kind === 'tv' ? search.season : 0, tag: tag, initiallyAvailable: available(p), snapshotAt: (getSnapshot() || {}).updatedAt || 0, progress: 0, state: 'Adding torrent'};
     // Persist intent before the network mutation so a restart can recover the tag.
     save();
-    api('POST', 'torrents/add', {urls: result.fileUrl, savepath: p.kind === 'tv' ? config.qbitShowsPath : config.qbitMoviesPath,
-      autoTMM: 'false', stopped: 'false', tags: 'fmtv,' + tag}, function (err, value) {
+    var addOptions = {urls: result.fileUrl, savepath: p.kind === 'tv' ? config.qbitShowsPath : config.qbitMoviesPath,
+      autoTMM: 'false', stopped: 'false', tags: 'fmtv,' + tag};
+    if (p.kind === 'tv') addOptions.sequentialDownload = 'true';
+    api('POST', 'torrents/add', addOptions, function (err, value) {
       if (err || value !== 'Ok.') { jobs[key].state = 'Add unconfirmed; check qBittorrent'; save(); done(err || new Error('qBittorrent did not confirm the download')); return; }
       lastPoll = 0; done(null, {started: true});
     });

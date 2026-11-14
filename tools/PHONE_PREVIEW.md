@@ -70,6 +70,8 @@ No service is installed or enabled by the build.
 With `qbittorrent_url` configured, title details offer **Search torrents** for unavailable titles and TV shows.
 Search terms include the movie’s release year or the show’s premiere year when known.
 Movie and TV-show searches temporarily use qBittorrent’s **all** category.
+New TV-show downloads enable sequential downloading (torrent piece order, not guaranteed episode order).
+Movie downloads and existing torrents are unchanged.
 Choose a season with −/+ on the results screen. The initial season is the first absent from Plex; presence
 does not guarantee a season is complete. Inspect the release names and tap anywhere on a result row to start downloading it. Results show seeds and size. They stop moving once you interact with a row; **Update results**
 appears only when newer results differ, and hides again after applying them. Back returns to details and cancels that search, while started downloads continue.

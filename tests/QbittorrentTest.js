@@ -44,7 +44,7 @@ const server = http.createServer((req, res) => {
 });
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const config = {qbitUrl: 'http://127.0.0.1:' + server.address().port, qbitUsername: 'user', qbitPassword: 'private', qbitShowsPath: '/shows'};
+  const config = {qbitUrl: 'http://127.0.0.1:' + server.address().port, qbitUsername: 'user', qbitPassword: 'private', qbitShowsPath: '/shows', qbitMoviesPath: '/movies'};
   const file = path.join(directory, 'jobs.json');
   const snapshot = {picks: [{imdbId: 'tt1', title: 'Example', year: 2020, kind: 'tv', options: []}]};
   let handle = create(config, file, () => snapshot, () => scans++);
@@ -59,6 +59,7 @@ const server = http.createServer((req, res) => {
   await call({action: 'results', searchId: 42});
   await call({action: 'download', searchId: 42, resultId: selectedId});
   assert.equal(added.get('urls'), 'https://example.test/b', 'Download identity survives changing seed rankings');
+  assert.equal(added.get('sequentialDownload'), 'true', 'New show torrents enable sequential downloading');
   assert.equal(added.get('savepath'), '/shows'); assert.equal(added.get('stopped'), 'false');
   assert.equal((await call({action: 'status'})).jobs[0].progress, 0.25);
   assert.equal(JSON.parse(fs.readFileSync(file)).jobs['tt1:2'].hash, 'abc');
@@ -89,6 +90,13 @@ const server = http.createServer((req, res) => {
     snapshot.entries = test.entryYear ? [{imdbId: 'tt1', year: test.entryYear}] : [];
     expectedCategory = 'all'; expectedPattern = test.expected;
     await call({action: 'search', season: 2});
+    if (test.kind === 'movie' && test.year === 1999) {
+      const movieResults = await call({action: 'results', searchId: 42});
+      await call({action: 'download', searchId: 42, resultId: movieResults.results[0].id});
+      assert.equal(added.has('sequentialDownload'), false, 'Movie add options remain unchanged');
+      assert.equal(added.get('savepath'), '/movies');
+      assert.equal(added.get('autoTMM'), 'false');
+    }
     await call({action: 'cancel', searchId: 42});
   }
   console.log('QbittorrentTest: all checks passed.');

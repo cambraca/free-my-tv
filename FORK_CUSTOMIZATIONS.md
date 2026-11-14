@@ -530,7 +530,9 @@ The first upstream merge needed these specific combinations; future merges must 
   service; preview refuses HTTP access to backend config/seed. Personal packages remain private.
 - Persist title/season links and unique qBittorrent tags atomically in `/media/internal/io.freemytv.torrents.json`
   (preview: `out/watchlist/torrents.json`). Recover torrent hashes from those tags. Downloads explicitly start,
-  with automatic torrent management off so configured destinations are honored. Never delete torrents/files.
+  with automatic torrent management off so configured destinations are honored. Add new TV-show torrents
+  with `sequentialDownload=true`; omit this option for movies. This prioritizes the torrent’s internal piece
+  order, not guaranteed episode completion order. Do not modify existing torrents. Never delete torrents/files.
 - Poll tracked downloads at most once a minute, or every five seconds while details are open; retry offline
   connections after a minute. Completed downloads trigger Plex library scans and forced watchlist refreshes,
   retried every two minutes until availability changes. Once a title has any available provider, prune its links
