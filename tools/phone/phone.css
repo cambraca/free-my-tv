@@ -30,7 +30,7 @@ body.details-open { overflow: hidden; }
 .detail-copy h2 { margin: 0 0 12px; font-size: 28px; line-height: 1.15; }
 .detail-copy p { line-height: 1.6; }
 .detail-meta { opacity: .7; margin: 0 0 20px; }
-.detail-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
 .detail-actions button { flex: 1 1 200px; }
 .detail-note { border-left: 3px solid #888; padding-left: 16px; }
 main { padding-top: 0; }
@@ -45,7 +45,9 @@ main { padding-top: 0; }
 .detail-rating { font-weight: 600; }
 .detail-credits { font-size: 15px; }
 .detail-credits p { margin: 8px 0; }
-#detail-progress { font-size: 14px; opacity: .8; }
+#detail-progress { font-size: 14px; opacity: .8; margin-bottom: 20px; }
+#detail-progress:empty { display: none; }
+#detail-progress p { margin: 4px 0; }
 
 .torrent-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0; }
 .torrent-controls button { padding: 8px 12px; }

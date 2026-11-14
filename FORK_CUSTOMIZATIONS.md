@@ -555,7 +555,9 @@ The first upstream merge needed these specific combinations; future merges must 
   preserve old `?remote=1` bookmarks. Detection never changes the installed TV app. Keep the connection status
   small, muted and close to the content, with no empty status space. Suppress optional metadata failure labels. Tapping any phone title always opens its details first; only the popup’s service action sends a
   launch command. Phone details fill the screen with 16:9 landscape artwork (poster fallback), a sticky
-  Back action, and service actions before the synopsis. Hide broken artwork and respect phone safe areas.
+  Back action. Keep year/season metadata, genres and rating immediately below the title, followed by
+  service/search actions. Place Plex-season status, download progress and related errors directly beneath
+  those actions, above credits and synopsis. Hide broken artwork and respect phone safe areas.
   Match TV detail information: movie/show badge, genre chips, TMDB rating, directors/creators, cast, season
   or episode counts, synopsis, labeled watchlist note, and configured download/Plex-season status. Enrich older
   cached titles through `/api/details`, retaining cached content on errors. Ignore responses after

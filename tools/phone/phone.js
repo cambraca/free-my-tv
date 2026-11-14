@@ -48,6 +48,7 @@ function renderDetails(pick) {
   const actions = element('div', ''); actions.id = 'detail-actions'; actions.className = 'detail-actions';
   copy.append(actions);
   content.append(copy);
+  const progress = element('div', ''); progress.id = 'detail-progress'; copy.append(progress);
   pick.options.forEach(option => {
     const button = element('button', 'Open on TV · ' + option.service);
     button.onclick = () => { document.getElementById('details').close(); command({action: 'launch', imdbId: pick.imdbId, app: option.app}); };
@@ -63,7 +64,6 @@ function renderDetails(pick) {
   credit('Cast', people.cast); copy.append(credits);
   if (pick.overview) copy.append(element('p', pick.overview));
   if (pick.note) { const note = element('div', ''); note.className = 'detail-note'; note.append(element('strong', 'Your note'), element('p', pick.note)); copy.append(note); }
-  const progress = element('div', ''); progress.id = 'detail-progress'; copy.append(progress);
 }
 async function details(pick) {
   torrentPanel?.dispose(); torrentPanel = null;
