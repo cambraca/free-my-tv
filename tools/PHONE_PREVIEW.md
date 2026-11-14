@@ -65,6 +65,18 @@ To stop and disable: `sudo systemctl disable --now free-my-tv-preview`.
 Source edits rebuild automatically. Server/configuration changes require `sudo systemctl restart free-my-tv-preview`.
 No service is installed or enabled by the build.
 
+## Torrent downloads from the phone
+
+With `qbittorrent_url` configured, title details offer **Search torrents** for unavailable titles and TV shows.
+Choose a season with −/+ on the results screen. The initial season is the first absent from Plex; presence
+does not guarantee a season is complete. Inspect the release names and tap a result’s **Download** action to
+start it. Results show seeds and size. They stop moving once you interact with a row; **Update results**
+appears only when newer results differ, and hides again after applying them. Back returns to details and cancels that search, while started downloads continue.
+
+Progress appears in title details, including the wait for Plex indexing. The computer handles the download
+and Plex refresh independently of the TV. This uses the same qBittorrent settings and destination folders as
+the TV version, but the preview has its own tracking file. No TV connection is needed to search or download.
+
 ## iPhone Home Screen icon
 
 In Safari, open the remote preview, tap Share → Add to Home Screen, keep Open as Web App enabled if offered,

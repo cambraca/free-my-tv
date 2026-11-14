@@ -46,3 +46,13 @@ main { padding-top: 0; }
 .detail-credits { font-size: 15px; }
 .detail-credits p { margin: 8px 0; }
 #detail-progress { font-size: 14px; opacity: .8; }
+
+.torrent-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0; }
+.torrent-controls button { padding: 8px 12px; }
+.torrent-results { display: flex; flex-direction: column; gap: 10px; }
+.torrent-result { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; width: 100%; text-align: left; padding: 16px; }
+.torrent-name { flex: 1 1 180px; overflow-wrap: anywhere; font-size: 14px; line-height: 1.4; }
+.torrent-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 12px; opacity: .7; }
+.torrent-download { font-size: 12px; font-weight: 600; }
+
+.torrent-controls[hidden] { display: none; }

@@ -560,6 +560,16 @@ The first upstream merge needed these specific combinations; future merges must 
   Keep search with a placeholder and accessible name, without a separate visible label. Do not add directional/OK/Back remote controls to the phone.
 - Remote preview messages: hide connected, TV-launch sending/success, missing-synopsis, and empty-Plex-season
   messages. The disconnected suffix is **TV not connected**. Keep real failures visible.
+- The remote details page exposes qBittorrent through `tools/phone/phone-torrents.js`, using the existing
+  `/api/torrents` backend and private credentials. Offer Search torrents for unavailable titles and TV shows,
+  retaining the tracked-hash suppression rule. Search runs in the full-screen details view with season controls,
+  the first absent season suggested (clamped to known totals), top 20 results, seeds/size, and explicit download
+  actions. Use the sticky Back action without a duplicate Details button. Freeze rows on pointer/touch/focus
+  interaction; show Update results only when the newest displayed fields differ from the frozen rows, and
+  hide it again after applying them. Download
+  handlers capture stable IDs and prevent duplicate taps. Returning to details, closing, or switching titles
+  cancels owned searches, including late responses. Poll progress every five seconds while visible; retry an
+  offline backend after a minute. The TV layout and shared backend behavior stay unchanged.
 - The TV long-polls only while visible, with bearer-token authentication and a configured source-IP check. Retain same-origin checks on browser APIs. It retries offline
   servers after 30 seconds. Dispatch only live commands, expire acknowledgements, never replay commands, and limit
   input to validated snapshot titles/services. No LG pairing or wake-up is implemented.

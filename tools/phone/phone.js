@@ -3,7 +3,7 @@
 if (globalThis.APP_VERSION) document.getElementById('brand-version').textContent = 'v' + globalThis.APP_VERSION;
 const status = document.getElementById('status');
 const connectionStatus = document.getElementById('connection');
-let picks = [], tab = 'all', busy = false, limit = 40, detailGeneration = 0;
+let picks = [], tab = 'all', busy = false, limit = 40, detailGeneration = 0, torrentPanel = null;
 async function json(url, options) {
   const response = await fetch(url, options), value = await response.json();
   if (!response.ok || value.error) throw new Error(value.error || 'Request failed');
@@ -45,7 +45,7 @@ function renderDetails(pick) {
   const genreRow = element('div', ''); genreRow.className = 'detail-genres';
   genres.forEach(genre => genreRow.append(element('span', genre))); copy.append(genreRow);
   if (pick.rating > 0) { const rating = element('p', '★ ' + Number(pick.rating).toFixed(1) + ' / 10 · TMDB'); rating.className = 'detail-rating'; copy.append(rating); }
-  const actions = element('div', ''); actions.className = 'detail-actions';
+  const actions = element('div', ''); actions.id = 'detail-actions'; actions.className = 'detail-actions';
   copy.append(actions);
   content.append(copy);
   pick.options.forEach(option => {
@@ -66,6 +66,7 @@ function renderDetails(pick) {
   const progress = element('div', ''); progress.id = 'detail-progress'; copy.append(progress);
 }
 async function details(pick) {
+  torrentPanel?.dispose(); torrentPanel = null;
   const generation = ++detailGeneration, dialog = document.getElementById('details');
   renderDetails(pick);
   document.body.classList.add('details-open'); dialog.showModal(); dialog.scrollTop = 0;
@@ -77,20 +78,16 @@ async function details(pick) {
     renderDetails(data.pick || pick); dialog.scrollTop = scroll;
     const progress = document.getElementById('detail-progress');
     if (data.downloadsEnabled) {
-      const torrentInfo = async action => json('/api/torrents', {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({action, imdbId: pick.imdbId})});
-      const results = await Promise.allSettled([torrentInfo('status'), ...(pick.kind === 'tv' ? [torrentInfo('seasons')] : [])]);
-      if (!current()) return;
-      results.forEach((result, index) => {
-        if (result.status === 'rejected') { progress.append(element('p', result.reason.message)); return; }
-        if (index === 1) {
-          if (result.value.seasons?.length) progress.append(element('p', 'Seasons in Plex: ' + result.value.seasons.join(', ')));
-        }
-        else if (!pick.options.length) (result.value.jobs || []).filter(job => job.imdbId === pick.imdbId).forEach(job => {
-          progress.append(element('p', (job.season ? 'S' + job.season + ' · ' : '') + Math.floor((job.progress || 0) * 100) + '% · '
-            + (job.complete ? 'Waiting for Plex…' : job.state)));
-        });
-      });
+      torrentPanel = PhoneTorrents({pick: data.pick || pick, dialog, content: document.getElementById('detail-content'),
+        actions: document.getElementById('detail-actions'), progress,
+        api: payload => json('/api/torrents', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)}),
+        current, onRefresh: load, getPick: () => picks.find(item => item.imdbId === pick.imdbId),
+        onViewChange: searching => {
+          const back = document.getElementById('close');
+          back.textContent = searching ? '← Back to details' : '← Back to titles';
+          if (searching) back.focus?.();
+        }});
+      await torrentPanel.ready;
     }
   } catch (error) {
     // Optional enrichment failed; keep the title information already displayed.
@@ -109,8 +106,11 @@ function render() {
   if (matching.length > limit) { const more = element('button', 'Show more'); more.onclick = () => { limit += 40; render(); }; list.append(more); }
   if (!list.children.length) list.append(element('p', 'No matching titles.'));
 }
-document.getElementById('details').addEventListener('close', () => { detailGeneration++; document.body.classList.remove('details-open'); });
-document.getElementById('close').onclick = () => document.getElementById('details').close();
+document.getElementById('details').addEventListener('close', () => { detailGeneration++; torrentPanel?.dispose(); torrentPanel = null; document.body.classList.remove('details-open'); });
+document.getElementById('close').onclick = () => {
+  if (torrentPanel?.searching) torrentPanel.back();
+  else document.getElementById('details').close();
+};
 document.getElementById('search').oninput = () => { limit = 40; render(); };
 document.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => {
   tab = button.dataset.tab; limit = 40;

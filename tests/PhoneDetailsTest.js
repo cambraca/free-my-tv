@@ -8,6 +8,8 @@ class Element {
   set id(value) { nodes[value] = this; }
   replaceChildren(...children) { this.children = children; }
   append(...children) { this.children.push(...children); }
+  setAttribute() {}
+  remove() {}
   addEventListener(type, callback) { this.listeners[type] = callback; }
   showModal() { this.open = true; }
   close() { this.open = false; this.listeners.close?.(); }
@@ -17,7 +19,7 @@ const pick = {imdbId: 'tt123', title: 'Example', kind: 'tv', meta: '2024 · Dram
   credits: {creators: ['Creator'], cast: ['Actor']}, options: [{app: 'plex', service: 'Plex'}]};
 const requests = [];
 let resolveSlow, connected = true, seasonList = [1];
-const context = {URLSearchParams, location: {search: ''}, setInterval() {}, document: {
+const context = {URLSearchParams, location: {search: ''}, setInterval() {}, setTimeout() {}, clearTimeout() {}, document: {
   hidden: false, body: new Element(), createElement() { return new Element(); },
   getElementById(id) { return nodes[id] ||= new Element(); }, querySelectorAll() { return []; }
 }, async fetch(url, options) {
@@ -30,7 +32,9 @@ const context = {URLSearchParams, location: {search: ''}, setInterval() {}, docu
   else value = {connected};
   return {ok: true, json: async () => value};
 }};
-vm.runInNewContext(fs.readFileSync('tools/phone/phone.js', 'utf8'), context);
+vm.createContext(context);
+vm.runInContext(fs.readFileSync('tools/phone/phone-torrents.js', 'utf8'), context);
+vm.runInContext(fs.readFileSync('tools/phone/phone.js', 'utf8'), context);
 const text = node => [node.textContent, ...node.children.map(text)].join(' ');
 async function run() {
   await new Promise(resolve => setImmediate(resolve));

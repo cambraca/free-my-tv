@@ -139,7 +139,7 @@ const server = http.createServer((incoming, response) => {
   if (['/', '/index.html', '/phone.html'].includes(pathname)) {
     pathname = require('./preview-mode')(incoming.url, incoming.headers['user-agent']) === 'remote' ? '/phone.html' : '/index.html';
   }
-  if (['/phone.html', '/phone.css', '/phone.js'].includes(pathname)) {
+  if (['/phone.html', '/phone.css', '/phone.js', '/phone-torrents.js'].includes(pathname)) {
     fs.readFile(path.join(__dirname, 'phone', pathname.slice(1)), (error, content) => {
       send(response, error ? 404 : 200, mime[path.extname(pathname)], error ? 'Not found' : content);
     }); return;

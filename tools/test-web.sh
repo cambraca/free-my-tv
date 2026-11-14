@@ -9,3 +9,4 @@ node tests/PlexRemoteTargetTest.js
 node tests/PreviewDetailsTest.js
 node tests/PhoneDetailsTest.js
 node tests/PreviewModeTest.js
+node tests/PhoneTorrentsTest.js
