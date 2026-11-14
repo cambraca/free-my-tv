@@ -11,10 +11,9 @@ async function json(url, options) {
 }
 async function command(payload) {
   if (busy) return;
-  busy = true; status.textContent = 'Sending to TV…';
+  busy = true; status.textContent = '';
   try {
     await json('/api/remote/command', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
-    status.textContent = 'Command accepted. Check the TV for the result.';
   } catch (error) { status.textContent = error.message; }
   finally { busy = false; }
 }
@@ -62,7 +61,7 @@ function renderDetails(pick) {
   }
   credit(pick.kind === 'tv' ? 'Created by' : 'Directed by', pick.kind === 'tv' ? people.creators : people.directors);
   credit('Cast', people.cast); copy.append(credits);
-  copy.append(element('p', pick.overview || 'No synopsis available.'));
+  if (pick.overview) copy.append(element('p', pick.overview));
   if (pick.note) { const note = element('div', ''); note.className = 'detail-note'; note.append(element('strong', 'Your note'), element('p', pick.note)); copy.append(note); }
   const progress = element('div', ''); progress.id = 'detail-progress'; copy.append(progress);
 }
@@ -84,7 +83,9 @@ async function details(pick) {
       if (!current()) return;
       results.forEach((result, index) => {
         if (result.status === 'rejected') { progress.append(element('p', result.reason.message)); return; }
-        if (index === 1) progress.append(element('p', result.value.seasons?.length ? 'Seasons in Plex: ' + result.value.seasons.join(', ') : 'No seasons in Plex'));
+        if (index === 1) {
+          if (result.value.seasons?.length) progress.append(element('p', 'Seasons in Plex: ' + result.value.seasons.join(', ')));
+        }
         else if (!pick.options.length) (result.value.jobs || []).filter(job => job.imdbId === pick.imdbId).forEach(job => {
           progress.append(element('p', (job.season ? 'S' + job.season + ' · ' : '') + Math.floor((job.progress || 0) * 100) + '% · '
             + (job.complete ? 'Waiting for Plex…' : job.state)));
@@ -123,7 +124,7 @@ async function load() {
     connectionStatus.textContent = data.refreshing ? 'Refreshing watchlist…' : picks.length + ' titles';
     if (!busy) {
       const connection = await json('/api/remote/status');
-      connectionStatus.textContent += connection.connected ? ' · TV connected' : ' · Open Free My TV on the TV to connect';
+      connectionStatus.textContent += connection.connected ? '' : ' · TV not connected';
     }
   } catch (error) { connectionStatus.textContent = error.message; }
 }

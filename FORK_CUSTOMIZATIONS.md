@@ -558,6 +558,8 @@ The first upstream merge needed these specific combinations; future merges must 
   Remote-mode category tabs use compact 14px text and an underline for selection, without filled button
   backgrounds. Keep these styles in `tools/phone/phone.css`; never change TV tabs to match.
   Keep search with a placeholder and accessible name, without a separate visible label. Do not add directional/OK/Back remote controls to the phone.
+- Remote preview messages: hide connected, TV-launch sending/success, missing-synopsis, and empty-Plex-season
+  messages. The disconnected suffix is **TV not connected**. Keep real failures visible.
 - The TV long-polls only while visible, with bearer-token authentication and a configured source-IP check. Retain same-origin checks on browser APIs. It retries offline
   servers after 30 seconds. Dispatch only live commands, expire acknowledgements, never replay commands, and limit
   input to validated snapshot titles/services. No LG pairing or wake-up is implemented.
