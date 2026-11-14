@@ -110,7 +110,8 @@ module.exports = function (config, filename, getSnapshot, refresh) {
     if (action === 'search') {
       api('GET', 'search/plugins', {}, function (err, plugins) {
         if (err) { done(err); return; }
-        var category = p.kind === 'tv' ? 'tv' : 'movies';
+        // Temporary workaround for plugins with unreliable category-specific searches.
+        var category = 'all';
         var names = (Array.isArray(plugins) ? plugins : []).filter(function (plugin) {
           return plugin.enabled && (plugin.supportedCategories || []).some(function (c) { return c.id === category; });
         }).map(function (plugin) { return plugin.name; });

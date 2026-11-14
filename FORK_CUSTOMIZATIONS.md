@@ -512,7 +512,8 @@ The first upstream merge needed these specific combinations; future merges must 
   for the title, including while waiting for Plex; allow searching again if qBittorrent reports it removed. The search results screen allows choosing a season with −/+ for later
   seasons even when earlier episodes are in Plex; changing season starts a new search. Hide − on season 1
   and + on the final known season; clamp suggested/search seasons to the known total. Unknown totals retain +. Read season presence from Plex and suggest the first absent
-  season; presence does not prove a season is complete. Search only plugins supporting movies/tv categories.
+  season; presence does not prove a season is complete. Temporarily search both movies and shows with the **all** category and only enabled plugins advertising
+  **all**, to work around unreliable category-specific searches. Preserve release-year and season terms.
   Movie queries use **title + release year**; show queries use **title + premiere year + Sxx**.
   Preserve an explicit year on snapshot picks, with IMDb-entry/metadata fallbacks for older caches; omit
   unknown/invalid years. Show results omit explicit single episode releases; users must inspect release names for complete

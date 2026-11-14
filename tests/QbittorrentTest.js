@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const create = require('../webos/service/qbittorrent');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fmtv-qbit-'));
-let expectedCategory = 'tv', expectedPattern = 'Example 2020 S02';
+let expectedCategory = 'all', expectedPattern = 'Example 2020 S02';
 let calls = [], complete = false, added, scans = 0, startError = true, reranked = false;
 const server = http.createServer((req, res) => {
   let body = '';
@@ -19,11 +19,17 @@ const server = http.createServer((req, res) => {
       res.setHeader('Set-Cookie', 'SID=test; path=/'); res.end('Ok.'); return;
     }
     assert.equal(req.headers.cookie, 'SID=test');
-    if (url.pathname.endsWith('/search/plugins')) res.end(JSON.stringify([{name: 'test', enabled: true, supportedCategories: [{id: 'tv'}, {id: 'movies'}]}]));
+    if (url.pathname.endsWith('/search/plugins')) res.end(JSON.stringify([
+      {name: 'all-only', enabled: true, supportedCategories: [{id: 'all'}]},
+      {name: 'movie-only', enabled: true, supportedCategories: [{id: 'movies'}]},
+      {name: 'tv-only', enabled: true, supportedCategories: [{id: 'tv'}]},
+      {name: 'disabled', enabled: false, supportedCategories: [{id: 'all'}, {id: 'movies'}]}
+    ]));
     else if (url.pathname.endsWith('/search/start')) {
       if (startError) { res.statusCode = 409; res.end('Python must be installed to use the Search Engine.'); return; }
       const params = new URLSearchParams(body);
       assert.equal(params.get('category'), expectedCategory); assert.equal(params.get('pattern'), expectedPattern);
+      assert.equal(params.get('plugins'), 'all-only');
       res.end('{"id":42}');
     } else if (url.pathname.endsWith('/search/delete')) res.end();
     else if (url.pathname.endsWith('/search/results')) res.end(JSON.stringify({status: 'Stopped', results: [
@@ -81,7 +87,7 @@ const server = http.createServer((req, res) => {
   ]) {
     snapshot.picks[0] = {imdbId: 'tt1', title: 'Example', options: [], kind: test.kind, year: test.year, meta: test.meta};
     snapshot.entries = test.entryYear ? [{imdbId: 'tt1', year: test.entryYear}] : [];
-    expectedCategory = test.kind === 'tv' ? 'tv' : 'movies'; expectedPattern = test.expected;
+    expectedCategory = 'all'; expectedPattern = test.expected;
     await call({action: 'search', season: 2});
     await call({action: 'cancel', searchId: 42});
   }
