@@ -201,6 +201,9 @@ These two selection policies are deliberately different. Do not share one orderi
 - Keep a very faint version label beside **TV**: 18px, 22% opacity, inheriting the title's light/dark color.
   The canonical fork version is `webos/appinfo.json` → `version`. The shared web builder exposes that same value
   as `window.APP_VERSION`, so the visible label and webOS package version agree without duplicate version strings.
+  Remote preview branding also uses the duck image, **TV**, and the same faint version label; load the generated
+  `version.js` for this label without needing the full private client configuration. Scale the remote header
+  proportionally: 42px title, version at 18/76 of the title size, 22% opacity, and a similarly sized duck.
 - **Bump the patch version for every change set**, including UI, service, build, and documentation changes,
   before building or committing it. One bump per coherent change set is enough; automatic preview rebuilds alone
   do not need a bump. Never reuse a deployed version for changed sources or lower it during an upstream merge.

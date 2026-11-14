@@ -1,5 +1,6 @@
 /* Served only by the preview. The TV's fixed-stage renderer is left untouched. */
 'use strict';
+if (globalThis.APP_VERSION) document.getElementById('brand-version').textContent = 'v' + globalThis.APP_VERSION;
 const status = document.getElementById('status');
 const connectionStatus = document.getElementById('connection');
 let picks = [], tab = 'all', busy = false, limit = 40, detailGeneration = 0;

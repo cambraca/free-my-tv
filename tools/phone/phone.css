@@ -3,8 +3,9 @@
 body { margin: 0; background: #F5F5F7; color: #1D1D1F; font: 16px Inter, sans-serif; }
 header, main { max-width: 960px; margin: auto; padding: 20px; }
 header { display: flex; align-items: center; gap: 10px; }
-header img { width: 48px; height: 48px; object-fit: contain; }
-h1 { margin: 0; font-size: 24px; flex: 1; } a { color: inherit; font-size: 14px; }
+header img { width: 46px; height: 42px; object-fit: contain; }
+h1 { margin: 0; font-size: 42px; font-weight: 600; letter-spacing: .004em; line-height: 1; white-space: nowrap; flex: 1; } a { color: inherit; font-size: 14px; }
+h1 .version { margin-left: 6px; font-size: .237em; letter-spacing: 0; font-weight: 400; opacity: .22; white-space: nowrap; }
 button, input { font: inherit; color: inherit; }
 button { min-height: 48px; padding: 10px 16px; border: 1px solid #ccc; border-radius: 16px; background: #fff; cursor: pointer; }
 button:focus-visible, input:focus { outline: 3px solid #777; }

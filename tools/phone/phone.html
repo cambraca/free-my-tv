@@ -1,10 +1,11 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Free My TV</title>
+<title>TV</title>
 <link rel="stylesheet" href="phone.css"></head>
-<body><header><img src="logo%20pato.png" alt=""><h1>Free My TV</h1><a href="/?mode=tv">TV layout</a></header>
+<body><header><img src="logo%20pato.png" alt=""><h1>TV<span id="brand-version" class="version"></span></h1><a href="/?mode=tv">TV layout</a></header>
 <main><p id="connection">Loading watchlist…</p><p id="status" role="status"></p>
 <nav aria-label="Watchlist"><button data-tab="all" aria-pressed="true">Explore</button><button data-tab="movie">Movies</button><button data-tab="tv">Shows</button><button data-tab="unavailable">Unavailable</button><button data-tab="watched">Watched</button></nav>
 <div class="search"><input id="search" type="search" aria-label="Search watchlist" placeholder="Search watchlist"></div>
 <div id="titles"></div><dialog id="details" aria-labelledby="detail-title"><div class="detail-toolbar"><button id="close" aria-label="Back to titles">← Back to titles</button></div><div id="detail-content"></div></dialog></main>
+<script src="version.js"></script>
 <script src="phone.js"></script></body></html>
