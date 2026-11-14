@@ -204,6 +204,9 @@ These two selection policies are deliberately different. Do not share one orderi
   Remote preview branding also uses the duck image, **TV**, and the same faint version label; load the generated
   `version.js` for this label without needing the full private client configuration. Scale the remote header
   proportionally: 42px title, version at 18/76 of the title size, 22% opacity, and a similarly sized duck.
+  The remote preview advertises `web/apple-touch-icon.png` for iPhone Home Screen installation and
+  `web/app-icon.svg` for browser tabs: the original duck logo centered on a light background, without added lettering. Use the iPhone shortcut name **TV** as the label.
+  Regenerate both with `python3 tools/make_phone_icon.py` (Python cairo); keep the source logo intact.
 - **Bump the patch version for every change set**, including UI, service, build, and documentation changes,
   before building or committing it. One bump per coherent change set is enough; automatic preview rebuilds alone
   do not need a bump. Never reuse a deployed version for changed sources or lower it during an upstream merge.

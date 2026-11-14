@@ -64,3 +64,9 @@ journalctl -u free-my-tv-preview -f
 To stop and disable: `sudo systemctl disable --now free-my-tv-preview`.
 Source edits rebuild automatically. Server/configuration changes require `sudo systemctl restart free-my-tv-preview`.
 No service is installed or enabled by the build.
+
+## iPhone Home Screen icon
+
+In Safari, open the remote preview, tap Share → Add to Home Screen, keep Open as Web App enabled if offered,
+and name it **TV**. The page supplies a duck-only icon; the Home Screen name supplies the **TV** label. If you already added it before the icon was available,
+remove the old Home Screen shortcut and add it again; iOS caches these icons.
