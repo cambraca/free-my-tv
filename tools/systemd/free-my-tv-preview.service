@@ -1,0 +1,19 @@
+[Unit]
+Description=Free My TV phone preview and controller
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+# Replace YOUR_USER and the paths. Node.js 22+ and Python 3 must be installed.
+User=YOUR_USER
+WorkingDirectory=/home/YOUR_USER/repos/free-my-tv
+ExecStart=/usr/bin/env node /home/YOUR_USER/repos/free-my-tv/tools/preview.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

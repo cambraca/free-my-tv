@@ -178,7 +178,7 @@ def build(preview, config, generic=False, hd=False):
     if preview:
         app['watchlist-backend.json'] = json.dumps(config).encode('utf-8')
         webapp.preview(app, OUT)
-        print('Preview: run node tools/preview.js --no-build, then open http://127.0.0.1:8000.')
+        print('Preview: run node tools/preview.js --no-build, then open the address printed by the server (default http://127.0.0.1:43333).')
     print('Built %s (%s %s, %d KB)' % (os.path.basename(IPK), app_id, version, len(data) // 1024))
     if not config.get('imdbUserId'):
         print('No IMDb user ID: set imdb_user_id in config.properties to enable watchlist picks.')

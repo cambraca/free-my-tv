@@ -417,14 +417,15 @@ Use Node.js 22+ and Python 3; no Docker, npm install, or TV connection is requir
 node tools/preview.js
 ```
 
-Open `http://127.0.0.1:8000`. This serves the build over HTTP so JavaScript runs without `file://` security issues,
+Open `http://127.0.0.1:43333`. This serves the build over HTTP so JavaScript runs without `file://` security issues,
 builds the webOS preview, watches source/configuration changes, and rebuilds/reloads the page automatically.
 
 - Keep the user's existing build command, `python3 webos/build.py --preview`, working. To serve an already-built
   preview, use `node tools/preview.js --no-build`; this also watches for changes. `--port` and `--config` are supported.
 - Preview rebuilds use `--no-watchlist-sync` so editing CSS/JS does not synchronously recrawl the whole watchlist.
   The backend refreshes stale data separately, avoiding browser cross-origin restrictions for IMDb and Plex.
-- Keep the server bound to localhost: generated config and caches can contain credentials and personal data.
+- Default to localhost. Explicit `preview_host=0.0.0.0` enables LAN access without a browser login.
+  Generated config and caches can contain credentials and personal data.
   Restart the server after changing `tools/preview.js` itself; a browser reload does not reload the server process.
 - Keep atomic per-file preview output writes. Deleting the entire preview directory on each rebuild caused races
   with concurrent watchers and requests.
@@ -529,3 +530,11 @@ The first upstream merge needed these specific combinations; future merges must 
   retain their backend link until completion and a newer Plex/watchlist snapshot, while progress stays hidden. Progress is distinct from Plex indexing completion.
 - Background intervals run while the webOS service process is active; they do not guarantee polling after webOS
   suspends/terminates it. Opening the app resumes polling from durable links. UI polling pauses while hidden.
+
+
+## LAN preview service
+
+Default TCP port is **43333**, configurable with `preview_port` or `--port`. Use `preview_host` to opt into
+LAN access. See [preview and systemd instructions](tools/PHONE_PREVIEW.md). Keep backend configuration and
+service seeds blocked over HTTP. The systemd file is an example only; do not install services, change
+firewalls or deploy TV builds without explicit instructions.

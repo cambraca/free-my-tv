@@ -10,10 +10,17 @@ const root = path.resolve(__dirname, '..');
 const directory = path.join(root, 'out', 'webos');
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
-  console.log('node tools/preview.js [--port 8000] [--config path] [--no-build]');
+  console.log('node tools/preview.js [--port 43333] [--config path] [--no-build]');
   process.exit(0);
 }
-const port = args.includes('--port') ? Number(args[args.indexOf('--port') + 1]) : 8000;
+const propertiesPath = path.resolve(args.includes('--config') ? args[args.indexOf('--config') + 1] : path.join(root, 'config.properties'));
+const properties = {};
+if (fs.existsSync(propertiesPath)) fs.readFileSync(propertiesPath, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/).forEach(line => {
+  if (!line.trim() || line.trim().startsWith('#') || !line.includes('=')) return;
+  const at = line.indexOf('='); properties[line.slice(0, at).trim()] = line.slice(at + 1).trim().replace(/^"|"$/g, '');
+});
+const bind = properties.preview_host || '127.0.0.1';
+const port = args.includes('--port') ? Number(args[args.indexOf('--port') + 1]) : Number(properties.preview_port || 43333);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be between 1 and 65535.');
 const clients = new Set();
 const mime = {'.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json',
@@ -151,7 +158,7 @@ function rebuild(first) {
 }
 
 function start() {
-  server.listen(port, '127.0.0.1', () => console.log('Preview: http://127.0.0.1:' + port + ' — watching source files. Ctrl+C to stop.'));
+  server.listen(port, bind, () => console.log('Preview: http://' + bind + ':' + port + ' — watching source files. Ctrl+C to stop.'));
   function changed(filename) {
     if (String(filename).includes('__pycache__')) return;
     clearTimeout(debounce);
