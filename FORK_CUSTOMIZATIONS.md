@@ -566,8 +566,9 @@ The first upstream merge needed these specific combinations; future merges must 
 - The remote details page exposes qBittorrent through `tools/phone/phone-torrents.js`, using the existing
   `/api/torrents` backend and private credentials. Offer Search torrents for unavailable titles and TV shows,
   retaining the tracked-hash suppression rule. Search runs in the full-screen details view with season controls,
-  the first absent season suggested (clamped to known totals), top 20 results, seeds/size, and explicit download
-  actions. Use the sticky Back action without a duplicate Details button. Freeze rows on pointer/touch/focus
+  the first absent season suggested (clamped to known totals), and top 20 results with seeds/size.
+  The entire result row starts downloading; omit a separate visible Download label and retain an accessible
+  download name on the row button. Use the sticky Back action without a duplicate Details button. Freeze rows on pointer/touch/focus
   interaction; show Update results only when the newest displayed fields differ from the frozen rows, and
   hide it again after applying them. Download
   handlers capture stable IDs and prevent duplicate taps. Returning to details, closing, or switching titles

@@ -67,8 +67,8 @@ globalThis.PhoneTorrents = function ({pick, dialog, content, actions, progress, 
       const name = node('span', result.name); name.className = 'torrent-name';
       const stats = node('span'); stats.className = 'torrent-stats';
       stats.append(node('span', result.seeds + ' seeds'), node('span', (result.size / 1073741824).toFixed(1) + ' GB'));
-      const download = node('span', 'Download'); download.className = 'torrent-download';
-      button.append(name, stats, download);
+      button.setAttribute('aria-label', 'Download ' + result.name + ', ' + result.seeds + ' seeds, ' + (result.size / 1073741824).toFixed(1) + ' GB');
+      button.append(name, stats);
       for (const event of ['pointerover', 'pointerdown', 'touchstart', 'focus']) button.addEventListener(event, () => { frozen = true; refreshUpdateButton(); });
       button.onclick = () => startDownload(result.id);
       button.disabled = downloading;

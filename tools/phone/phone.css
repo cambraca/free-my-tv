@@ -53,6 +53,5 @@ main { padding-top: 0; }
 .torrent-result { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; width: 100%; text-align: left; padding: 16px; }
 .torrent-name { flex: 1 1 180px; overflow-wrap: anywhere; font-size: 14px; line-height: 1.4; }
 .torrent-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 12px; opacity: .7; }
-.torrent-download { font-size: 12px; font-weight: 600; }
 
 .torrent-controls[hidden] { display: none; }
