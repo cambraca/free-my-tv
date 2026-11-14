@@ -30,7 +30,7 @@ const clients = new Set();
 const mime = {'.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ttf': 'font/ttf'};
 let config, snapshot, snapshotPath, Watchlist, request;
-let torrents;
+let torrents, titleDetails;
 let refreshing = false, attemptedAt = 0, lastError = '', building = false, queued = false, debounce;
 
 function load() {
@@ -53,6 +53,8 @@ function load() {
     lastError = '';
   }
   config = nextConfig;
+  delete require.cache[require.resolve('./preview-details')];
+  titleDetails = require('./preview-details')(config, () => snapshot, request);
   torrents = require('../webos/service/qbittorrent')(config, path.join(root, 'out', 'watchlist', 'torrents.json'), () => snapshot, () => scanPlex());
   attemptedAt = 0;
   lastError = '';
@@ -119,6 +121,13 @@ const server = http.createServer((incoming, response) => {
     });
     return;
   }
+  if (pathname === '/api/details') {
+    if (incoming.method !== 'GET') { send(response, 405, 'text/plain', 'GET required'); return; }
+    const id = new URL(incoming.url, 'http://localhost').searchParams.get('id');
+    titleDetails(id, (error, pick) => send(response, pick ? 200 : 404, 'application/json',
+      JSON.stringify({pick, detailsError: error ? error.message : '', downloadsEnabled: !!config.qbitUrl})));
+    return;
+  }
   if (pathname === '/api/watchlist') {
     const query = new URL(incoming.url, 'http://localhost').searchParams;
     refresh(query.get('refresh') === '1');
@@ -127,6 +136,14 @@ const server = http.createServer((incoming, response) => {
     return;
   }
   if (pathname === '/watchlist-backend.json' || pathname === '/watchlist-service-seed.json') { send(response, 403, 'text/plain', 'Forbidden'); return; }
+  if (['/', '/index.html', '/phone.html'].includes(pathname)) {
+    pathname = require('./preview-mode')(incoming.url, incoming.headers['user-agent']) === 'remote' ? '/phone.html' : '/index.html';
+  }
+  if (['/phone.html', '/phone.css', '/phone.js'].includes(pathname)) {
+    fs.readFile(path.join(__dirname, 'phone', pathname.slice(1)), (error, content) => {
+      send(response, error ? 404 : 200, mime[path.extname(pathname)], error ? 'Not found' : content);
+    }); return;
+  }
   const filename = path.resolve(directory, '.' + (pathname === '/' ? '/index.html' : pathname));
   if (!filename.startsWith(directory + path.sep)) { send(response, 403, 'text/plain', 'Forbidden'); return; }
   fs.readFile(filename, (error, content) => {

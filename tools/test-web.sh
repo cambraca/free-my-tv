@@ -6,3 +6,6 @@ node tests/TorrentSearchViewTest.js
 
 node tests/RemoteReceiverTest.js
 node tests/PlexRemoteTargetTest.js
+node tests/PreviewDetailsTest.js
+node tests/PhoneDetailsTest.js
+node tests/PreviewModeTest.js

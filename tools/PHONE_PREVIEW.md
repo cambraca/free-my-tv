@@ -14,9 +14,15 @@ Generate the token locally with `python3 -c "import secrets; print(secrets.token
 Use fixed/reserved LAN addresses for the computer and TV. These settings are shared by both instances.
 The token identifies the installed TV connection; browser access has no login. It is included in personal TV builds; never distribute those builds. Generic builds disable the bridge.
 
-Start `node tools/preview.js`. The preview exposes `/api/remote/status` and `/api/remote/command` for
-browser clients. Commands reference a title in the server snapshot and its configured service; no arbitrary
-launch parameters are accepted. The installed TV receiver identifies itself with the bridge token and `tv_ip`.
+Start `node tools/preview.js`. On your phone, open `http://YOUR_COMPUTER_LAN_IP:43333/`.
+Phones and recognized computer browsers automatically get the remote touch layout with the same logo,
+light/dark colors and watchlist. The TV layout link opens the original desktop preview.
+Bookmark `http://YOUR_COMPUTER_LAN_IP:43333/?mode=remote` to browse titles and open them on the TV. Tapping a title always opens its detail popup first;
+choose **Open on TV** for a service from that popup. Search filters the titles. There are no directional, OK or Back remote buttons.
+TV user agents and unclear devices default to the TV layout. Use `?mode=tv` or `?mode=remote` to force
+either layout on any browser. Explicit modes override detection. Old `?remote=1` bookmarks still work.
+The installed TV UI never changes. Connection status is compact and muted; optional metadata failures keep
+the cached title details without adding a warning label.
 
 Build the updated TV app using the same config and install it yourself. Open Free My TV on the TV before
 sending commands. The TV connects in the background, retries unavailable servers every 30 seconds, and remains

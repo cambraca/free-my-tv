@@ -424,8 +424,7 @@ builds the webOS preview, watches source/configuration changes, and rebuilds/rel
   preview, use `node tools/preview.js --no-build`; this also watches for changes. `--port` and `--config` are supported.
 - Preview rebuilds use `--no-watchlist-sync` so editing CSS/JS does not synchronously recrawl the whole watchlist.
   The backend refreshes stale data separately, avoiding browser cross-origin restrictions for IMDb and Plex.
-- Default to localhost. Explicit `preview_host=0.0.0.0` enables LAN access without a browser login.
-  Generated config and caches can contain credentials and personal data.
+- Default to localhost. Explicit `preview_host=0.0.0.0` enables LAN access without a browser login. The installed TV bridge still uses a `preview_token` of at least 24 characters. Generated config and caches can contain credentials and personal data.
   Restart the server after changing `tools/preview.js` itself; a browser reload does not reload the server process.
 - Keep atomic per-file preview output writes. Deleting the entire preview directory on each rebuild caused races
   with concurrent watchers and requests.
@@ -532,21 +531,33 @@ The first upstream merge needed these specific combinations; future merges must 
   suspends/terminates it. Opening the app resumes polling from durable links. UI polling pauses while hidden.
 
 
-## LAN preview service
+## Optional phone controller
 
-Default TCP port is **43333**, configurable with `preview_port` or `--port`. Use `preview_host` to opt into
-LAN access. See [preview and systemd instructions](tools/PHONE_PREVIEW.md). Keep backend configuration and
-service seeds blocked over HTTP. The systemd file is an example only; do not install services, change
-firewalls or deploy TV builds without explicit instructions.
-
-## Optional TV title bridge
-
-The shared private config supplies `preview_url`, `preview_token`, and `tv_ip`. `web/remote.js` detects webOS
-through its native platform bridge, adds no visible TV UI, and does not block startup or offline behavior.
-It long-polls only while visible, authenticates with a bearer token and source-IP check, and retries offline
-servers after 30 seconds. Generic builds have no bridge credentials. Browser APIs have no login; preserve
-same-origin checks, snapshot-title validation and expiring commands. Never queue or replay launches.
-
-Plex launches on the TV while the computer runs Companion follow-through, selecting exactly `tv_ip`.
-Normal TV-initiated launches retain the existing service path. No pairing, wake-up, autoplay or playback/volume
-control is implemented. Launch acknowledgements do not prove navigation worked on hardware.
+- See [phone setup and systemd instructions](tools/PHONE_PREVIEW.md). Default TCP port is **43333**, configurable
+  with `preview_port` or `--port`. LAN binding is explicit; browser pages and browser APIs require no login, while the TV receiver requires its bridge token; keep backend config/seed blocked.
+- The shared private config supplies `preview_url`, `preview_token`, and `tv_ip`. Installed webOS is detected by
+  the platform bridge, never by its screen size or config presence. `web/remote.js` adds no visible TV UI and
+  never blocks startup or normal offline behavior. Generic builds have no bridge credentials.
+- Modern phone assets live under `tools/phone/`, served only by the preview; preserve ES5 TV assets and the original
+  fixed-stage layout. Preview user-agent detection selects remote mode for recognizable phones and computers,
+  TV mode for TV agents, and defaults to TV mode when unclear. `?mode=tv` and `?mode=remote` override detection;
+  preserve old `?remote=1` bookmarks. Detection never changes the installed TV app. Keep the connection status
+  small, muted and close to the content, with no empty status space. Suppress optional metadata failure labels. Tapping any phone title always opens its details first; only the popup’s service action sends a
+  launch command. Phone details fill the screen with 16:9 landscape artwork (poster fallback), a sticky
+  Back action, and service actions before the synopsis. Hide broken artwork and respect phone safe areas.
+  Match TV detail information: movie/show badge, genre chips, TMDB rating, directors/creators, cast, season
+  or episode counts, synopsis, labeled watchlist note, and configured download/Plex-season status. Enrich older
+  cached titles through `/api/details`, retaining cached content on errors. Ignore responses after
+  the user closes details or selects another title. This endpoint is read-only and must not refresh providers.
+  Remote-mode category tabs use compact 14px text and an underline for selection, without filled button
+  backgrounds. Keep these styles in `tools/phone/phone.css`; never change TV tabs to match.
+  Keep search with a placeholder and accessible name, without a separate visible label. Do not add directional/OK/Back remote controls to the phone.
+- The TV long-polls only while visible, with bearer-token authentication and a configured source-IP check. Retain same-origin checks on browser APIs. It retries offline
+  servers after 30 seconds. Dispatch only live commands, expire acknowledgements, never replay commands, and limit
+  input to validated snapshot titles/services. No LG pairing or wake-up is implemented.
+- Phone-initiated Plex launches use the existing TV app launch but run Companion follow-through on the computer,
+  selecting exactly the configured TV IP rather than the computer's interfaces. Normal TV-initiated Plex launches
+  retain the existing service path. No autoplay or playback/volume control is added. Report failures on the phone;
+  acknowledgements do not prove navigation worked on hardware.
+- Provide the systemd unit as an example only: do not install services, change firewalls, or deploy TV builds
+  without explicit instructions. The user handles the real TV verification.
