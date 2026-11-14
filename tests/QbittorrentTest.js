@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const create = require('../webos/service/qbittorrent');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fmtv-qbit-'));
+let expectedCategory = 'tv', expectedPattern = 'Example 2020 S02';
 let calls = [], complete = false, added, scans = 0, startError = true, reranked = false;
 const server = http.createServer((req, res) => {
   let body = '';
@@ -18,11 +19,11 @@ const server = http.createServer((req, res) => {
       res.setHeader('Set-Cookie', 'SID=test; path=/'); res.end('Ok.'); return;
     }
     assert.equal(req.headers.cookie, 'SID=test');
-    if (url.pathname.endsWith('/search/plugins')) res.end(JSON.stringify([{name: 'test', enabled: true, supportedCategories: [{id: 'tv'}]}]));
+    if (url.pathname.endsWith('/search/plugins')) res.end(JSON.stringify([{name: 'test', enabled: true, supportedCategories: [{id: 'tv'}, {id: 'movies'}]}]));
     else if (url.pathname.endsWith('/search/start')) {
       if (startError) { res.statusCode = 409; res.end('Python must be installed to use the Search Engine.'); return; }
       const params = new URLSearchParams(body);
-      assert.equal(params.get('category'), 'tv'); assert.equal(params.get('pattern'), 'Example S02');
+      assert.equal(params.get('category'), expectedCategory); assert.equal(params.get('pattern'), expectedPattern);
       res.end('{"id":42}');
     } else if (url.pathname.endsWith('/search/delete')) res.end();
     else if (url.pathname.endsWith('/search/results')) res.end(JSON.stringify({status: 'Stopped', results: [
@@ -39,7 +40,7 @@ const server = http.createServer((req, res) => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const config = {qbitUrl: 'http://127.0.0.1:' + server.address().port, qbitUsername: 'user', qbitPassword: 'private', qbitShowsPath: '/shows'};
   const file = path.join(directory, 'jobs.json');
-  const snapshot = {picks: [{imdbId: 'tt1', title: 'Example', kind: 'tv', options: []}]};
+  const snapshot = {picks: [{imdbId: 'tt1', title: 'Example', year: 2020, kind: 'tv', options: []}]};
   let handle = create(config, file, () => snapshot, () => scans++);
   const call = payload => new Promise((resolve, reject) => handle({imdbId: 'tt1', ...payload}, (err, value) => err ? reject(err) : resolve(value)));
   await assert.rejects(call({action: 'search', season: 2}), /search\/start: HTTP 409.*Python must be installed/);
@@ -71,5 +72,18 @@ const server = http.createServer((req, res) => {
   assert.ok(calls.includes('/api/v2/search/delete'), 'A replacement search cancels its predecessor');
   await call({action: 'cancel', searchId: 42});
   await assert.rejects(call({action: 'results', searchId: 42}), /Search expired/);
+  for (const test of [
+    {kind: 'movie', year: 1999, expected: 'Example 1999'},
+    {kind: 'tv', meta: '2001 · Drama', expected: 'Example 2001 S02'},
+    {kind: 'movie', entryYear: 1984, expected: 'Example 1984'},
+    {kind: 'tv', expected: 'Example S02'},
+    {kind: 'movie', year: 'unknown', meta: 'Drama', expected: 'Example'}
+  ]) {
+    snapshot.picks[0] = {imdbId: 'tt1', title: 'Example', options: [], kind: test.kind, year: test.year, meta: test.meta};
+    snapshot.entries = test.entryYear ? [{imdbId: 'tt1', year: test.entryYear}] : [];
+    expectedCategory = test.kind === 'tv' ? 'tv' : 'movies'; expectedPattern = test.expected;
+    await call({action: 'search', season: 2});
+    await call({action: 'cancel', searchId: 42});
+  }
   console.log('QbittorrentTest: all checks passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => { server.close(); fs.rmSync(directory, {recursive: true, force: true}); });

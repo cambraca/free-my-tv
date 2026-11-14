@@ -368,6 +368,7 @@
       else backdrop = local && local.art ? plexURL(config, local.art) : entry.poster;
       picks.push({id: entry.imdbId, imdbId: entry.imdbId, kind: resolved ? resolved.kind : local ? local.kind : entry.kind,
         title: resolved && resolved.title || local && local.title || entry.title, backdrop: backdrop,
+        year: entry.year || local && local.year || null,
         tmdbId: resolved && resolved.id,
         poster: resolved && resolved.poster ? 'https://image.tmdb.org/t/p/w500' + resolved.poster : entry.poster || '',
         overview: resolved && resolved.overview || '', genres: resolved && resolved.genres || [],

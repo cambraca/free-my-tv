@@ -68,6 +68,7 @@ No service is installed or enabled by the build.
 ## Torrent downloads from the phone
 
 With `qbittorrent_url` configured, title details offer **Search torrents** for unavailable titles and TV shows.
+Search terms include the movie’s release year or the show’s premiere year when known.
 Choose a season with −/+ on the results screen. The initial season is the first absent from Plex; presence
 does not guarantee a season is complete. Inspect the release names and tap a result’s **Download** action to
 start it. Results show seeds and size. They stop moving once you interact with a row; **Update results**

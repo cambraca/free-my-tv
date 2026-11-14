@@ -513,7 +513,9 @@ The first upstream merge needed these specific combinations; future merges must 
   seasons even when earlier episodes are in Plex; changing season starts a new search. Hide − on season 1
   and + on the final known season; clamp suggested/search seasons to the known total. Unknown totals retain +. Read season presence from Plex and suggest the first absent
   season; presence does not prove a season is complete. Search only plugins supporting movies/tv categories.
-  Show queries use Sxx and omit explicit single episode releases; users must inspect release names for complete
+  Movie queries use **title + release year**; show queries use **title + premiere year + Sxx**.
+  Preserve an explicit year on snapshot picks, with IMDb-entry/metadata fallbacks for older caches; omit
+  unknown/invalid years. Show results omit explicit single episode releases; users must inspect release names for complete
   packs. Show the top 20 results as they arrive, sorted by seeds descending. Freeze visible rows when the user
   navigates/points at a result; Update results explicitly applies the latest top 20. Keep stable torrent IDs
   for download selection even when backend rankings change. Torrent rows have an explicit download action

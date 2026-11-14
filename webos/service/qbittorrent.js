@@ -115,7 +115,19 @@ module.exports = function (config, filename, getSnapshot, refresh) {
           return plugin.enabled && (plugin.supportedCategories || []).some(function (c) { return c.id === category; });
         }).map(function (plugin) { return plugin.name; });
         if (!names.length) { done(new Error('Enable a qBittorrent search plugin supporting ' + category)); return; }
-        var pattern = p.title + (p.kind === 'tv' ? ' S' + (season < 10 ? '0' : '') + season : ' ' + (p.year || ''));
+        // Older snapshots did not copy the year onto picks; retain their IMDb entry/meta fallback.
+        var year = p.year, snapshot = getSnapshot();
+        function validYear(value) { return /^[12][0-9]{3}$/.test(String(value || '')); }
+        if (!validYear(year)) (snapshot && snapshot.entries || []).some(function (entry) {
+          if (entry.imdbId !== payload.imdbId || !validYear(entry.year)) return false;
+          year = entry.year; return true;
+        });
+        if (!validYear(year)) {
+          var match = /^([12][0-9]{3})(?:\s*·|$)/.exec(String(p.meta || '').trim());
+          year = match ? match[1] : '';
+        }
+        var pattern = p.title + (year ? ' ' + year : '')
+          + (p.kind === 'tv' ? ' S' + (season < 10 ? '0' : '') + season : '');
         api('POST', 'search/start', {pattern: pattern, plugins: names.join('|'), category: category}, function (error, result) {
           if (error || !result || result.id === undefined) { done(error || new Error('Could not start search')); return; }
           var id = result.id;
