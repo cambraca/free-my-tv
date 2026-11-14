@@ -538,3 +538,15 @@ Default TCP port is **43333**, configurable with `preview_port` or `--port`. Use
 LAN access. See [preview and systemd instructions](tools/PHONE_PREVIEW.md). Keep backend configuration and
 service seeds blocked over HTTP. The systemd file is an example only; do not install services, change
 firewalls or deploy TV builds without explicit instructions.
+
+## Optional TV title bridge
+
+The shared private config supplies `preview_url`, `preview_token`, and `tv_ip`. `web/remote.js` detects webOS
+through its native platform bridge, adds no visible TV UI, and does not block startup or offline behavior.
+It long-polls only while visible, authenticates with a bearer token and source-IP check, and retries offline
+servers after 30 seconds. Generic builds have no bridge credentials. Browser APIs have no login; preserve
+same-origin checks, snapshot-title validation and expiring commands. Never queue or replay launches.
+
+Plex launches on the TV while the computer runs Companion follow-through, selecting exactly `tv_ip`.
+Normal TV-initiated launches retain the existing service path. No pairing, wake-up, autoplay or playback/volume
+control is implemented. Launch acknowledgements do not prove navigation worked on hardware.

@@ -77,7 +77,15 @@ def read_config(path):
         if not 1 <= port <= 65535:
             sys.exit('config.properties: qbittorrent_url port must be between 1 and 65535.')
 
+    remote_url = values.get('preview_url', '').rstrip('/')
+    if remote_url and not re.fullmatch(r'http://[a-zA-Z0-9.-]+(?::[0-9]{1,5})?', remote_url):
+        sys.exit('config.properties: preview_url must be http://computer-address:port without a path.')
+    if remote_url and len(values.get('preview_token', '')) < 24:
+        sys.exit('config.properties: preview_url requires preview_token with at least 24 characters.')
+
     return {
+        'remoteUrl': values.get('preview_url', '').rstrip('/'),
+        'remoteToken': values.get('preview_token', ''),
         'qbitUrl': qbit_url,
         'qbitUsername': values.get('qbittorrent_username', ''),
         'qbitPassword': values.get('qbittorrent_password', ''),
@@ -104,7 +112,8 @@ def watchlist_paths(config):
     directory = os.path.join(ROOT, 'out', 'watchlist')
     os.makedirs(directory, exist_ok=True)
     config_path = os.path.join(directory, 'config.json')
-    identity = hashlib.sha256(json.dumps(config, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()[:16]
+    cache_config = {key: value for key, value in config.items() if key not in ('remoteUrl', 'remoteToken')}
+    identity = hashlib.sha256(json.dumps(cache_config, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()[:16]
     snapshot_path = os.path.join(directory, 'snapshot-' + identity + '.json')
     return config_path, snapshot_path
 

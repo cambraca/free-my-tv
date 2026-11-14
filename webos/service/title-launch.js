@@ -1,7 +1,9 @@
 'use strict';
 
 var os = require('os');
-var Watchlist = require('./watchlist');
+var Watchlist;
+try { Watchlist = require('./watchlist'); }
+catch (error) { Watchlist = require('../../web/watchlist'); } // source-tree preview; packaged service has ./watchlist
 var mubiIds = {}, commandId = Math.floor(Date.now() / 1000);
 
 exports.mubiTarget = function (target, request, done) {
@@ -36,12 +38,12 @@ exports.openPlex = function (config, snapshot, imdbId, request, done) {
     done(new Error('Plex library match is unavailable.')); return;
   }
   var base = 'http://' + config.plexHost + ':' + (config.plexPort || 32400);
-  var addresses = [], interfaces;
-  try { interfaces = os.networkInterfaces(); }
+  var addresses = config.tvIp ? [config.tvIp] : [], interfaces;
+  try { interfaces = config.tvIp ? {} : os.networkInterfaces(); }
   catch (error) { done(new Error('Plex could not identify this TV on the network.')); return; }
   for (var name in interfaces) if (interfaces.hasOwnProperty(name)) {
     (interfaces[name] || []).forEach(function (network) {
-      if (!network.internal) addresses.push(network.address.replace(/^::ffff:/, ''));
+      if (!config.tvIp && !network.internal) addresses.push(network.address.replace(/^::ffff:/, ''));
     });
   }
   var deadline = Date.now() + 10000, attempts = 0;

@@ -20,6 +20,10 @@ if (fs.existsSync(propertiesPath)) fs.readFileSync(propertiesPath, 'utf8').repla
   const at = line.indexOf('='); properties[line.slice(0, at).trim()] = line.slice(at + 1).trim().replace(/^"|"$/g, '');
 });
 const bind = properties.preview_host || '127.0.0.1';
+const token = properties.preview_token || '';
+if (properties.tv_ip && !require('node:net').isIPv4(properties.tv_ip)) throw new Error('tv_ip must be an IPv4 address.');
+if (properties.preview_url && token.length < 24) throw new Error('TV bridge requires preview_token with at least 24 characters.');
+const remote = require('./preview-remote')({token, tvIp: properties.tv_ip || '', getState: () => ({config, snapshot, request})});
 const port = args.includes('--port') ? Number(args[args.indexOf('--port') + 1]) : Number(properties.preview_port || 43333);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be between 1 and 65535.');
 const clients = new Set();
@@ -36,7 +40,7 @@ function load() {
   for (const filename of ['./watchlist-network', '../web/watchlist', '../webos/service/qbittorrent', '../webos/service/plex-scan']) delete require.cache[require.resolve(filename)];
   Watchlist = require('../web/watchlist');
   request = require('./watchlist-network');
-  const identity = crypto.createHash('sha256').update(JSON.stringify(nextConfig, Object.keys(nextConfig).sort())).digest('hex').slice(0, 16);
+  const identity = crypto.createHash('sha256').update(JSON.stringify(nextConfig, Object.keys(nextConfig).filter(key => !['remoteUrl', 'remoteToken'].includes(key)).sort())).digest('hex').slice(0, 16);
   snapshotPath = path.join(root, 'out', 'watchlist', 'snapshot-' + identity + '.json');
   if (!config || Watchlist.source(config) !== Watchlist.source(nextConfig)) {
     snapshot = null;
@@ -97,6 +101,7 @@ const server = http.createServer((incoming, response) => {
   let pathname;
   try { pathname = decodeURIComponent(new URL(incoming.url, 'http://localhost').pathname); }
   catch (error) { send(response, 400, 'text/plain', 'Bad request'); return; }
+  if (remote.handle(incoming, response, pathname)) return;
   if (pathname === '/preview-events') {
     response.writeHead(200, {'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive'});
     response.write(': connected\n\n');

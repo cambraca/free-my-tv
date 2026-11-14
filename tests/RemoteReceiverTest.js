@@ -1,0 +1,28 @@
+'use strict';
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const fs = require('node:fs');
+const source = fs.readFileSync('web/remote.js', 'utf8');
+const scheduled = [], launches = [], calls = [];
+function XHR() { calls.push(this); }
+XHR.prototype.open = function (method, url) { this.url = url; };
+XHR.prototype.setRequestHeader = function () {};
+XHR.prototype.send = function (body) { this.body = JSON.parse(body); };
+const context = {TV: {name: 'browser'}, CONFIG: {}, setTimeout(fn) { scheduled.push(fn); }};
+vm.runInNewContext(source, context);
+assert.equal(scheduled.length, 0, 'Browser never becomes a TV receiver');
+context.TV = {name: 'webos', launchPick(id, pick, done) { launches.push({id, pick}); done(true); }};
+vm.runInNewContext(source, context);
+assert.equal(scheduled.length, 0, 'Unconfigured TV remains independent');
+context.CONFIG = {remoteUrl: 'http://example.test:43333', remoteToken: 'test-token'};
+context.XMLHttpRequest = XHR;
+context.document = {hidden: false, addEventListener() {}};
+vm.runInNewContext(source, context);
+scheduled.shift()();
+assert.equal(calls[0].url, 'http://example.test:43333/api/remote/poll');
+calls[0].status = 200; calls[0].responseText = JSON.stringify({id: 'test', action: 'launch', appId: 'netflix', pick: {app: 'netflix', imdbId: 'tt123'}}); calls[0].onload();
+assert.equal(launches.length, 1);
+assert.equal(launches[0].id, 'netflix');
+assert.equal(launches[0].pick.imdbId, 'tt123');
+assert.equal(calls[1].body.id, 'test');
+console.log('RemoteReceiverTest: opt-in, nonblocking startup and title-launch checks passed.');
