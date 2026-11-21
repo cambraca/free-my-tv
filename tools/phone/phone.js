@@ -4,6 +4,52 @@ if (globalThis.APP_VERSION) document.getElementById('brand-version').textContent
 const status = document.getElementById('status');
 const connectionStatus = document.getElementById('connection');
 let picks = [], tab = 'all', busy = false, limit = 40, detailGeneration = 0, torrentPanel = null;
+const accounts = globalThis.IMDB_ACCOUNTS || [];
+const accountKey = 'fmtv.imdbAccount';
+function stored(key) {
+  try { return JSON.parse(localStorage.getItem(key)); } catch (error) { return null; }
+}
+const savedAccount = stored(accountKey);
+let activeAccount = accounts.find(profile => profile.id === savedAccount)?.id || accounts[0]?.id || '';
+let accountGeneration = 0;
+function accountQuery() { return activeAccount ? 'account=' + encodeURIComponent(activeAccount) : ''; }
+function renderProfiles() {
+  if (accounts.length < 2) return;
+  const holder = document.getElementById('profiles');
+  holder.hidden = false;
+  holder.replaceChildren();
+  accounts.forEach(profile => {
+    const button = element('button', '');
+    button.title = profile.name;
+    button.setAttribute('aria-label', profile.name);
+    button.disabled = profile.id === activeAccount;
+    button.setAttribute('aria-pressed', String(profile.id === activeAccount));
+    const face = element('span', profile.name.charAt(0).toUpperCase());
+    face.className = 'profile-face';
+    if (profile.avatar) {
+      const image = document.createElement('img');
+      image.alt = '';
+      image.onerror = () => image.remove();
+      image.src = profile.avatar;
+      face.append(image);
+    }
+    button.append(face, element('span', profile.name));
+    button.onclick = () => {
+      if (activeAccount === profile.id) return;
+      activeAccount = profile.id;
+      accountGeneration++;
+      try { localStorage.setItem(accountKey, JSON.stringify(activeAccount)); } catch (error) {}
+      picks = []; limit = 40;
+      connectionStatus.textContent = 'Loading watchlist…';
+      for (const item of holder.children) {
+        item.disabled = item === button;
+        item.setAttribute('aria-pressed', String(item.disabled));
+      }
+      render(); load();
+    };
+    holder.append(button);
+  });
+}
 async function json(url, options) {
   const response = await fetch(url, options), value = await response.json();
   if (!response.ok || value.error) throw new Error(value.error || 'Request failed');
@@ -13,7 +59,7 @@ async function command(payload) {
   if (busy) return;
   busy = true; status.textContent = '';
   try {
-    await json('/api/remote/command', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+    await json('/api/remote/command', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...payload, account: activeAccount})});
   } catch (error) { status.textContent = error.message; }
   finally { busy = false; }
 }
@@ -72,7 +118,7 @@ async function details(pick) {
   document.body.classList.add('details-open'); dialog.showModal(); dialog.scrollTop = 0;
   const current = () => generation === detailGeneration && dialog.open;
   try {
-    const data = await json('/api/details?id=' + encodeURIComponent(pick.imdbId));
+    const data = await json('/api/details?id=' + encodeURIComponent(pick.imdbId) + (activeAccount ? '&' + accountQuery() : ''));
     if (!current()) return;
     const scroll = dialog.scrollTop;
     renderDetails(data.pick || pick); dialog.scrollTop = scroll;
@@ -118,14 +164,22 @@ document.querySelectorAll('[data-tab]').forEach(button => button.onclick = () =>
 });
 async function load() {
   if (document.hidden) return;
+  const generation = accountGeneration;
   try {
-    const data = await json('/api/watchlist');
-    if (data.snapshot) { picks = data.snapshot.picks; render(); }
+    const data = await json('/api/watchlist' + (activeAccount ? '?' + accountQuery() : ''));
+    if (generation !== accountGeneration) return;
+    if (data.snapshot) {
+      const source = data.snapshot.source;
+      const legacy = stored('fmtv.watched');
+      const watched = source && (stored('fmtv.watched.' + source) || (legacy?.source === source ? legacy : null));
+      picks = data.snapshot.picks.map(pick => watched?.ids?.[pick.imdbId] ? {...pick, watched: true} : pick);
+      render();
+    }
     connectionStatus.textContent = data.refreshing ? 'Refreshing watchlist…' : picks.length + ' titles';
     if (!busy) {
       const connection = await json('/api/remote/status');
-      connectionStatus.textContent += connection.connected ? '' : ' · TV not connected';
+      if (generation === accountGeneration) connectionStatus.textContent += connection.connected ? '' : ' · TV not connected';
     }
-  } catch (error) { connectionStatus.textContent = error.message; }
+  } catch (error) { if (generation === accountGeneration) connectionStatus.textContent = error.message; }
 }
-load(); setInterval(load, 15000);
+renderProfiles(); load(); setInterval(load, 15000);

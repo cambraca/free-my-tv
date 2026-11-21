@@ -2,11 +2,20 @@
 // Shared by the webOS service and localhost preview. Never sends credentials to the UI.
 var fs = require('fs'), http = require('http'), https = require('https'), URL = require('url');
 var qs = require('querystring'), crypto = require('crypto');
-module.exports = function (config, filename, getSnapshot, refresh) {
+module.exports = function (config, filename, getSnapshot, refresh, snapshotsComplete) {
   var base = config.qbitUrl, cookie = '', jobs = {}, searches = {}, lastPoll = 0, busy = false;
   var retryAfter = 0;
-  var identity = crypto.createHash('sha256').update((base || '') + '|' + (config.imdbUserId || '')).digest('hex');
-  try { var saved = JSON.parse(fs.readFileSync(filename, 'utf8')); if (saved.identity === identity) jobs = saved.jobs || {}; } catch (e) {}
+  function cacheIdentity(account) {
+    return crypto.createHash('sha256').update((base || '') + '|' + account).digest('hex');
+  }
+  var identity = cacheIdentity('');
+  var profiles = config.imdbAccounts || [{id: config.imdbUserId || ''}];
+  try {
+    var saved = JSON.parse(fs.readFileSync(filename, 'utf8'));
+    if (saved.identity === identity || profiles.some(function (profile) { return saved.identity === cacheIdentity(profile.id); })) {
+      jobs = saved.jobs || {};
+    }
+  } catch (e) {}
   function save() {
     fs.writeFileSync(filename + '.tmp', JSON.stringify({identity: identity, jobs: jobs}));
     fs.renameSync(filename + '.tmp', filename);
@@ -43,14 +52,15 @@ module.exports = function (config, filename, getSnapshot, refresh) {
     });
   }
   function pick(id) {
-    var picks = (getSnapshot() || {}).picks || [];
+    var picks = (getSnapshot(id) || {}).picks || [];
     return picks.filter(function (p) { return (p.imdbId || p.id) === id; })[0];
   }
   function resultId(result) { return crypto.createHash('sha256').update(result.fileUrl + '|' + (result.engineName || '')).digest('hex'); }
   function available(p) { return p && (p.options || []).length > 0; }
   function prune() {
     Object.keys(jobs).forEach(function (key) { var job = jobs[key], current = pick(job.imdbId);
-      if (!current || available(current) && (!job.initiallyAvailable || job.complete && (getSnapshot() || {}).updatedAt > job.snapshotAt)) delete jobs[key]; });
+      if ((!current && (!snapshotsComplete || snapshotsComplete()))
+          || available(current) && (!job.initiallyAvailable || job.complete && (getSnapshot(job.imdbId) || {}).updatedAt > job.snapshotAt)) delete jobs[key]; });
   }
   function poll(fast, done) {
     prune(); save();
@@ -64,7 +74,9 @@ module.exports = function (config, filename, getSnapshot, refresh) {
     api('GET', 'torrents/info', {tag: 'fmtv'}, function (err, torrents) {
       if (err || !Array.isArray(torrents)) { finish(err || new Error('Invalid torrent response')); return; }
       active.forEach(function (key) {
-        var job = jobs[key], torrent = torrents.filter(function (t) { return job.hash ? t.hash === job.hash : (t.tags || '').split(',').map(function (s) { return s.trim(); }).indexOf(job.tag) >= 0; })[0];
+        var job = jobs[key];
+        if (!job) return;
+        var torrent = torrents.filter(function (t) { return job.hash ? t.hash === job.hash : (t.tags || '').split(',').map(function (s) { return s.trim(); }).indexOf(job.tag) >= 0; })[0];
         if (!torrent) { job.state = job.hash ? 'Removed from qBittorrent' : 'Waiting for torrent metadata'; return; }
         job.hash = torrent.hash; job.progress = torrent.progress; job.state = torrent.state;
         job.complete = Number(torrent.amount_left) === 0 && Number(torrent.progress) >= 1;
@@ -95,7 +107,7 @@ module.exports = function (config, filename, getSnapshot, refresh) {
     }
     if (!p) { done(new Error('Title is no longer in the watchlist')); return; }
     if (action === 'seasons') {
-      var snapshot = getSnapshot(), local = snapshot && snapshot.plex && snapshot.plex.items['imdb:' + payload.imdbId];
+      var snapshot = getSnapshot(payload.imdbId), local = snapshot && snapshot.plex && snapshot.plex.items['imdb:' + payload.imdbId];
       if (!local || !config.plexHost) { done(null, {seasons: [], next: 1}); return; }
       var network;
       try { network = require('./watchlist-network'); } catch (e) { network = require('../../tools/watchlist-network'); }
@@ -117,7 +129,7 @@ module.exports = function (config, filename, getSnapshot, refresh) {
         }).map(function (plugin) { return plugin.name; });
         if (!names.length) { done(new Error('Enable a qBittorrent search plugin supporting ' + category)); return; }
         // Older snapshots did not copy the year onto picks; retain their IMDb entry/meta fallback.
-        var year = p.year, snapshot = getSnapshot();
+        var year = p.year, snapshot = getSnapshot(payload.imdbId);
         function validYear(value) { return /^[12][0-9]{3}$/.test(String(value || '')); }
         if (!validYear(year)) (snapshot && snapshot.entries || []).some(function (entry) {
           if (entry.imdbId !== payload.imdbId || !validYear(entry.year)) return false;
@@ -164,7 +176,7 @@ module.exports = function (config, filename, getSnapshot, refresh) {
     if (jobs[key]) { done(new Error('Already tracking a download for this title/season')); return; }
     if (!result || !/^(magnet:\?|https?:\/\/)/i.test(result.fileUrl)) { done(new Error('Invalid torrent URL')); return; }
     var tag = 'fmtv-' + crypto.randomBytes(8).toString('hex');
-    jobs[key] = {imdbId: payload.imdbId, season: p.kind === 'tv' ? search.season : 0, tag: tag, initiallyAvailable: available(p), snapshotAt: (getSnapshot() || {}).updatedAt || 0, progress: 0, state: 'Adding torrent'};
+    jobs[key] = {imdbId: payload.imdbId, season: p.kind === 'tv' ? search.season : 0, tag: tag, initiallyAvailable: available(p), snapshotAt: (getSnapshot(payload.imdbId) || {}).updatedAt || 0, progress: 0, state: 'Adding torrent'};
     // Persist intent before the network mutation so a restart can recover the tag.
     save();
     var addOptions = {urls: result.fileUrl, savepath: p.kind === 'tv' ? config.qbitShowsPath : config.qbitMoviesPath,

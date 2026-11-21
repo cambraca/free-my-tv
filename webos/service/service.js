@@ -7,63 +7,32 @@ var request = require('./watchlist-network');
 var titleLaunch = require('./title-launch');
 var config = require('./config.json');
 var service = new Service('io.freemytv.watchlist');
-var target = '/media/internal/io.freemytv.watchlist.json';
-var snapshot = null, loading = true, running = false, lastError = '', attemptedAt = 0;
-var waiting = [];
+var target = '/media/internal/io.freemytv.watchlist';
+var legacy;
+try { legacy = JSON.parse(fs.readFileSync(target + '.json', 'utf8')); } catch (error) {}
+var lists = require('./watchlists')(Watchlist, config, request, function (id) {
+  return target + '-' + id + '.json';
+}, require('./watchlist-seed.json'), legacy);
 
-fs.readFile(target, 'utf8', function (err, text) {
-  if (!err) {
-    try { snapshot = JSON.parse(text); } catch (parseError) {}
-  }
-  if (!Watchlist.valid(snapshot, config)) {
-    try { snapshot = require('./watchlist-seed.json'); } catch (seedError) { snapshot = null; }
-  }
-  if (!Watchlist.valid(snapshot, config)) snapshot = null;
-  loading = false;
-  waiting.splice(0).forEach(function (callback) { callback(); });
-});
-
-function refresh(force) {
-  if (running || (!force && Date.now() - attemptedAt < 10 * 60000)) return;
-  if (!force && snapshot && !snapshot.warnings.length && Watchlist.fresh(snapshot.updatedAt) && Watchlist.notesReady(snapshot)
-      && Watchlist.plexLinksReady(snapshot) && Watchlist.watchedReady(snapshot) && Watchlist.availabilityReady(snapshot)) return;
-  running = true;
-  attemptedAt = Date.now();
+function refreshActivity(start) {
   service.activityManager.create('watchlist-refresh', function (activity) {
-    Watchlist.sync(config, snapshot, request, snapshot ? null : function (partial) { snapshot = partial; }, function (err, result) {
-      lastError = err ? err.message : '';
-      function finished() { running = false; service.activityManager.complete(activity); }
-      if (err) { finished(); return; }
-      snapshot = result;
-      fs.writeFile(target + '.tmp', JSON.stringify(result), function (writeError) {
-        if (writeError) { lastError = 'Could not save the watchlist cache.'; finished(); return; }
-        fs.rename(target + '.tmp', target, function (renameError) {
-          if (renameError) lastError = 'Could not save the watchlist cache.';
-          finished();
-        });
-      });
-    }, force);
+    start(function () { service.activityManager.complete(activity); });
   });
 }
 
 service.register('get', function (message) {
-  function respond() {
-    if (message.payload.refresh !== false) refresh(message.payload.force === true);
-    var client = Watchlist.clientSnapshot(snapshot, message.payload.source, message.payload.updatedAt);
-    message.respond({returnValue: true, snapshot: client, refreshing: running, error: lastError});
-  }
-  if (loading) waiting.push(respond);
-  else respond();
+  var payload = message.payload, state = lists.get(payload.account);
+  if (!state) { message.respond({returnValue: true, snapshot: null, refreshing: false}); return; }
+  if (payload.refresh !== false) lists.refresh(state, payload.force === true, refreshActivity);
+  var client = Watchlist.clientSnapshot(state.snapshot, payload.source, payload.updatedAt);
+  message.respond({returnValue: true, snapshot: client, refreshing: state.running, error: state.error});
 });
 
 service.register('plexTarget', function (message) {
-  function respond() {
-    Watchlist.plexTarget(config, snapshot, message.payload.imdbId, request, function (err, url) {
-      message.respond({returnValue: !err, url: url || ''});
-    });
-  }
-  if (loading) waiting.push(respond);
-  else respond();
+  var state = lists.forTitle(message.payload.imdbId);
+  Watchlist.plexTarget(state ? state.config : config, state && state.snapshot, message.payload.imdbId, request, function (err, url) {
+    message.respond({returnValue: !err, url: url || ''});
+  });
 });
 
 service.register('mubiTarget', function (message) {
@@ -77,41 +46,35 @@ service.register('mubiTarget', function (message) {
 
 var openingPlex = false;
 service.register('openPlex', function (message) {
-  function respond() {
-    if (openingPlex) { message.respond({returnValue: false}); return; }
-    openingPlex = true;
-    service.activityManager.create('plex-title', function (activity) {
-      titleLaunch.openPlex(config, snapshot, message.payload.imdbId, request, function (err) {
-        openingPlex = false;
-        if (err) console.warn('Plex title navigation: ' + err.message);
-        message.respond({returnValue: !err});
-        service.activityManager.complete(activity);
-      });
+  if (openingPlex) { message.respond({returnValue: false}); return; }
+  openingPlex = true;
+  service.activityManager.create('plex-title', function (activity) {
+    var state = lists.forTitle(message.payload.imdbId);
+    titleLaunch.openPlex(state ? state.config : config, state && state.snapshot, message.payload.imdbId, request, function (err) {
+      openingPlex = false;
+      if (err) console.warn('Plex title navigation: ' + err.message);
+      message.respond({returnValue: !err});
+      service.activityManager.complete(activity);
     });
-  }
-  if (loading) waiting.push(respond);
-  else respond();
+  });
 });
 
 require('./remote-apps')(service);
 
 var torrents = require('./qbittorrent')(config, '/media/internal/io.freemytv.torrents.json',
-  function () { return snapshot; }, function () {
-    require('./plex-scan')(config, request, function () { refresh(true); });
-  });
+  lists.torrentSnapshot, function () {
+    require('./plex-scan')(config, request, function () { lists.refreshAll(refreshActivity); });
+  }, lists.complete);
 service.register('torrents', function (message) {
-  function respond() {
-    service.activityManager.create('torrent-request', function (activity) {
-      torrents(message.payload, function (err, result) {
-        message.respond(err ? {returnValue: true, error: err.message} : result);
-        service.activityManager.complete(activity);
-      });
+  service.activityManager.create('torrent-request', function (activity) {
+    torrents(message.payload, function (err, result) {
+      message.respond(err ? {returnValue: true, error: err.message} : result);
+      service.activityManager.complete(activity);
     });
-  }
-  if (loading) waiting.push(respond); else respond();
+  });
 });
 setInterval(function () {
-  if (loading || !config.qbitUrl) return;
+  if (!config.qbitUrl) return;
   service.activityManager.create('torrent-poll', function (activity) {
     torrents({action: 'status'}, function () { service.activityManager.complete(activity); });
   });

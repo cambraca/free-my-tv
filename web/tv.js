@@ -534,11 +534,11 @@ var TV = (function () {
       xhr.send(JSON.stringify(payload));
     },
 
-    watchlist: function (done, force, known) {
+    watchlist: function (done, force, known, account) {
       if (!webos && window.FMTV_PREVIEW) {
         var request = new XMLHttpRequest();
-        var query = force ? 'refresh=1&' : '';
-        if (known) query += 'source=' + encodeURIComponent(known.source) + '&updatedAt=' + known.updatedAt;
+        var query = 'account=' + encodeURIComponent(account || '') + (force ? '&refresh=1' : '');
+        if (known) query += '&source=' + encodeURIComponent(known.source) + '&updatedAt=' + known.updatedAt;
         request.open('GET', '/api/watchlist' + (query ? '?' + query : ''), true);
         request.timeout = 15000;
         request.onload = function () {
@@ -550,7 +550,7 @@ var TV = (function () {
         request.send();
         return;
       }
-      luna('luna://io.freemytv.watchlist/get', {refresh: true, force: !!force,
+      luna('luna://io.freemytv.watchlist/get', {refresh: true, force: !!force, account: account,
         source: known ? known.source : '', updatedAt: known ? known.updatedAt : 0}, done);
     },
 

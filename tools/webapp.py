@@ -54,9 +54,17 @@ def read_config(path):
             sys.exit('config.properties: %s must be a number (got "%s")' % (key, v))
         return v
 
-    imdb_user = values.get('imdb_user_id', '')
-    if imdb_user and not re.fullmatch(r'(ur\d+|p\.[a-zA-Z0-9]+)', imdb_user):
-        sys.exit('config.properties: imdb_user_id must be an IMDb user ID, not a URL.')
+    imdb_ids = [value.strip() for value in values.get('imdb_user_id', '').split(',') if value.strip()]
+    if any(not re.fullmatch(r'(ur\d+|p\.[a-zA-Z0-9]+)', user_id) for user_id in imdb_ids):
+        sys.exit('config.properties: imdb_user_id requires comma-separated IMDb user IDs (ur... or p....).')
+    if len(imdb_ids) != len(set(imdb_ids)):
+        sys.exit('config.properties: imdb_user_id contains duplicate IDs.')
+    names = [value.strip() for value in values.get('imdb_name', '').split(',')]
+    accounts = []
+    for index, user_id in enumerate(imdb_ids):
+        avatar = 'profiles/user%d.jpg' % (index + 1)
+        accounts.append({'id': user_id, 'name': (names[index] if index < len(names) else '') or user_id,
+                         'avatar': avatar if os.path.isfile(os.path.join(ROOT, 'web', avatar)) else ''})
     plex_host = values.get('plex_host', '')
     if plex_host and not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9.-]*', plex_host):
         sys.exit('config.properties: plex_host must be an IP address or hostname without http://, port or path.')
@@ -98,7 +106,8 @@ def read_config(path):
         'city': values.get('city', ''),
         'language': values.get('language', 'auto') or 'auto',
         'temperature': values.get('temperature', 'auto') or 'auto',
-        'imdbUserId': imdb_user,
+        'imdbUserId': imdb_ids[0] if imdb_ids else '',
+        'imdbAccounts': accounts,
         'watchlistServices': services,
         'plexHost': plex_host,
         'plexPort': int(plex_port),
@@ -112,7 +121,7 @@ def watchlist_paths(config):
     directory = os.path.join(ROOT, 'out', 'watchlist')
     os.makedirs(directory, exist_ok=True)
     config_path = os.path.join(directory, 'config.json')
-    cache_config = {key: value for key, value in config.items() if key not in ('remoteUrl', 'remoteToken')}
+    cache_config = {key: value for key, value in config.items() if key not in ('remoteUrl', 'remoteToken', 'imdbAccounts')}
     identity = hashlib.sha256(json.dumps(cache_config, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()[:16]
     snapshot_path = os.path.join(directory, 'snapshot-' + identity + '.json')
     return config_path, snapshot_path
@@ -122,24 +131,28 @@ def watchlist_seed(config):
     """Refresh the build's private snapshot and bundle the last complete successful sync."""
     if not config.get('imdbUserId'):
         return None
-    config_path, snapshot_path = watchlist_paths(config)
+    accounts = config['imdbAccounts']
+    config_path = watchlist_paths(config)[0]
+    paths = {account['id']: watchlist_paths(dict(config, imdbUserId=account['id']))[1] for account in accounts}
     with open(config_path, 'w', encoding='utf-8') as handle:
         json.dump(config, handle)
-    node = shutil.which('node')
-    if '--no-watchlist-sync' in sys.argv:
-        pass
-    elif node:
-        result = subprocess.run([node, os.path.join(ROOT, 'tools', 'sync-watchlist.js'), config_path, snapshot_path],
-                                check=False, env=dict(os.environ, NODE_NO_WARNINGS='1'))
-        if result.returncode:
-            print('Watchlist sync failed; bundling the last matching snapshot, if available.')
-    else:
-        print('Install Node.js to preload your watchlist. The webOS service can also fetch it after installation.')
-    try:
-        with open(snapshot_path, encoding='utf-8') as handle:
-            return json.load(handle)
-    except (OSError, ValueError):
-        return None
+    if '--no-watchlist-sync' not in sys.argv:
+        node = shutil.which('node')
+        if node:
+            result = subprocess.run([node, os.path.join(ROOT, 'tools', 'sync-watchlist.js'), config_path, json.dumps(paths)],
+                                    check=False, env=dict(os.environ, NODE_NO_WARNINGS='1'))
+            if result.returncode:
+                print('Watchlist sync failed; bundling the last matching snapshot for each account, if available.')
+        else:
+            print('Install Node.js to preload your watchlist. The webOS service can also fetch it after installation.')
+    seeds = {}
+    for user_id, snapshot_path in paths.items():
+        try:
+            with open(snapshot_path, encoding='utf-8') as handle:
+                seeds[user_id] = json.load(handle)
+        except (OSError, ValueError):
+            pass
+    return seeds
 
 
 def catalogues():
@@ -152,24 +165,28 @@ def files(config, made_by):
     """The web app's files, {path inside the app: bytes}: web/, the settings, the catalogues, the app's symbols and font."""
     out = {}
     web = os.path.join(ROOT, 'web')
+    profile_assets = {account['avatar'] for account in config.get('imdbAccounts', [])}
     for directory, _, names in os.walk(web):
         for name in sorted(names):
             path = os.path.join(directory, name)
             target = os.path.relpath(path, web).replace(os.sep, '/')
+            if target.startswith('profiles/') and target not in profile_assets:
+                continue
             with open(path, 'rb') as f:
                 out[target] = f.read()
     with open(os.path.join(ROOT, 'webos', 'appinfo.json'), encoding='utf-8') as handle:
         version = json.load(handle)['version']
     out['version.js'] = ('window.APP_VERSION = %s;\n' % json.dumps(version)).encode('utf-8')
+    out['version.js'] += ('window.IMDB_ACCOUNTS = %s;\n' % json.dumps(config.get('imdbAccounts', []))).encode('utf-8')
     out['config.js'] = ('/* Generated by %s. */\nwindow.APP_VERSION = %s;\nwindow.CONFIG = %s;\n'
                         % (made_by, json.dumps(version), json.dumps({key: value for key, value in config.items() if key not in ('qbitUsername', 'qbitPassword')}, ensure_ascii=False))).encode('utf-8')
     seed = watchlist_seed(config)
     out['watchlist-service-seed.json'] = json.dumps(seed, ensure_ascii=False).encode('utf-8')
-    client_seed = None
-    if seed:
-        client_seed = {key: seed[key] for key in ('schema', 'source', 'updatedAt', 'picks', 'warnings')}
-        client_seed['entries'] = [entry['imdbId'] for entry in seed['entries']]
-    out['watchlist-seed.js'] = ('window.WATCHLIST_SEED = %s;\n' % json.dumps(client_seed, ensure_ascii=False)).encode('utf-8')
+    client_seeds = {}
+    for user_id, snapshot in (seed or {}).items():
+        client_seeds[user_id] = {key: snapshot[key] for key in ('schema', 'source', 'updatedAt', 'picks', 'warnings')}
+        client_seeds[user_id]['entries'] = [entry['imdbId'] for entry in snapshot['entries']]
+    out['watchlist-seed.js'] = ('window.WATCHLIST_SEEDS = %s;\n' % json.dumps(client_seeds, ensure_ascii=False)).encode('utf-8')
     out['i18n.js'] = ('/* Generated by %s from app/assets/i18n. */\nwindow.I18N_CATALOGUES = %s;\n'
                       % (made_by, json.dumps(catalogues(), ensure_ascii=False, separators=(',', ':')))).encode('utf-8')
     symbols = os.path.join(ROOT, 'app', 'assets', 'symbols')

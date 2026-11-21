@@ -2,7 +2,7 @@
  * The home screen for web-app TVs (LG webOS, Samsung Tizen), with the Android app's design and behavior (HomeView):
  *  - top: the title, Explore/Movies/Shows tabs and Settings;
  *  - three weighted watchlist picks per launch; the background is the first one's photo, blurred and almost white;
- *  - the glass shelf with the apps; ↓ opens the selected tab's scrollable watchlist and compact weather;
+ *  - the glass shelf with the apps; ↓ opens the selected tab's scrollable watchlist;
  *  - a night look from sunset to sunrise; a screensaver after a few idle minutes.
  * The remote's arrows, OK and Back move the focus; a pointer (LG's Magic Remote) focuses what it points at.
  */
@@ -53,6 +53,11 @@
 
   /** The 1920 × 1080 stage fills the window (on the TV it already is 1920 × 1080). */
   function fit() {
+    if (TV.isPreview) {
+      setClass(body, 'browser-preview', true);
+      stage.style.zoom = body.clientWidth / 1920;
+      return;
+    }
     var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
     stage.style.webkitTransform = stage.style.transform = s === 1 ? '' : 'scale(' + s + ')';
   }
@@ -222,18 +227,31 @@
     }
     var buttons = $('buttons');
     buttons.innerHTML = '';
-    var defs = [
-      // ['live_tv', tr('TV aberta', 'Live TV', 'TV en vivo')],
-      // ['hdmi', tr('Entradas HDMI', 'HDMI Inputs', 'Entradas HDMI')],
-      ['settings', tr('Ajustes', 'Settings', 'Ajustes')]
-    ];
-    for (var b = 0; b < defs.length; b++) {
-      var r = el('button', 'round last', buttons);
-      r.style.left = '1772px';
-      sym(defs[b][0], r);
-      el('div', 'tip', r, defs[b][1]);
-      hover(r, Z.TOP, TAB_KIND.length + b);
-    }
+    var profiles = Data.accounts.length > 1 ? Data.accounts : [];
+    var spacing = 112, left = 1764 - profiles.length * spacing;
+    profiles.forEach(function (profile, index) {
+      var button = el('button', 'round profile', buttons);
+      var selected = profile.id === Data.activeAccount();
+      button.style.left = left + index * spacing + 'px';
+      button.setAttribute('aria-label', profile.name);
+      button.setAttribute('aria-pressed', String(selected));
+      button.disabled = selected;
+      button.title = profile.name;
+      var face = el('span', 'profile-face', button, profile.name.charAt(0).toUpperCase());
+      if (profile.avatar) {
+        var image = el('img', '', face);
+        image.alt = '';
+        image.onerror = function () { face.removeChild(image); };
+        image.src = profile.avatar;
+      }
+      el('span', 'tip profile-name', button, profile.name);
+      if (!selected) hover(button, Z.TOP, TAB_KIND.length + index);
+    });
+    var settings = el('button', 'round last', buttons);
+    settings.style.left = '1772px';
+    sym('settings', settings);
+    el('div', 'tip', settings, tr('Ajustes', 'Settings', 'Ajustes'));
+    hover(settings, Z.TOP, TAB_KIND.length + profiles.length);
   }
 
   function renderWatchlistStatus() {
@@ -253,11 +271,11 @@
 
   // MARK: - Picks and background
 
-  function renderCards() {
+  function renderCards(force) {
     var list = Data.picks(TAB_KIND[st.tab]);
     var holder = $('cards');
     setClass(body, 'no-picks', !list.length);
-    var same = list.length === cards.length;
+    var same = !force && list.length === cards.length;
     for (var i = 0; same && i < list.length; i++) same = list[i].id === cards[i].id && list[i].backdrop === cards[i].backdrop
         && list[i].meta === cards[i].meta && list[i].title === cards[i].title && list[i].app === cards[i].app
         && list[i].url === cards[i].url && list[i].note === cards[i].note;
@@ -408,24 +426,6 @@
     for (var nodeIndex = 0; nodeIndex < nodes.length; nodeIndex++) {
       setClass(nodes[nodeIndex], 'focus', st.zone === Z.DRAWER && nodes[nodeIndex].pickIndex === st.drawer);
     }
-  }
-
-  function renderPanels() {
-    var card = $('weather-widget');
-    card.innerHTML = '';
-    card.style.display = Prefs.weather() ? '' : 'none';
-    if (!Prefs.weather()) return;
-    el('div', 'place', card, Data.city || tr('Clima', 'Weather', 'Clima'));
-    var weather = Data.weather;
-    if (!weather) {
-      el('div', 'condition', card, tr('Sem dados do clima agora.', 'No weather data right now.', 'No hay datos del clima ahora.'));
-      return;
-    }
-    var current = el('div', 'current', card);
-    sym(Data.symbol(weather.code, weather.isDay), current);
-    el('span', 'temp', current, Data.degrees(weather.temp));
-    el('div', 'condition', card, Data.condition(weather.code, weather.isDay));
-    el('div', 'range', card, Data.degrees(weather.max) + ' / ' + Data.degrees(weather.min));
   }
 
   // function renderPrices(card, coins) {
@@ -653,7 +653,18 @@
     switch (st.zone) {
       case Z.TOP:
         if (st.top < TAB_KIND.length) return;
-        openSettings();
+        var index = st.top - TAB_KIND.length;
+        if (Data.accounts.length > 1 && index < Data.accounts.length) {
+          var profile = Data.accounts[index];
+          if (profile.id !== Data.activeAccount()) {
+            manualRefresh = false;
+            st.top = st.tab;
+            st.card = st.drawer = st.first = 0;
+            browsePicks = [];
+            browsePositions = TAB_KIND.map(function () { return {index: 0, first: 0}; });
+            Data.switchAccount(profile.id);
+          }
+        } else openSettings();
         return;
       case Z.CARDS:
         var p = cards[st.card], app = p && Data.appFor(p.app);
@@ -1024,7 +1035,10 @@
         break;
       case Z.TOP:
         if (dx) {
-          st.top = Math.max(0, Math.min(TAB_KIND.length, st.top + dx));
+          var topButtons = $('buttons').children, nextTop = st.top + dx;
+          var nextButton = topButtons[nextTop - TAB_KIND.length];
+          if (nextButton && nextButton.disabled) nextTop += dx;
+          st.top = Math.max(0, Math.min(TAB_KIND.length + topButtons.length - 1, nextTop));
           if (st.top < TAB_KIND.length) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
         } else if (dy > 0) {
           if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < TAB_KIND.length ? 0 : cards.length - 1); }
@@ -1300,7 +1314,6 @@
     renderCards();
     renderShelf();
     renderDrawer();
-    renderPanels();
     renderClock();
     checkNight();
     if (st.zone === Z.SETTINGS) renderSettings();
@@ -1343,16 +1356,17 @@
   Data.onChange(function (kind) {
     if (document.hidden) return;
     if (kind !== 'weather') renderWatchlistStatus();
-    if (kind === 'watchlist' || kind === 'settings') {
-      renderCards();
+    if (kind === 'account') renderTop();
+    if (kind === 'account' || kind === 'watchlist' || kind === 'settings') {
+      renderCards(kind === 'account');
       renderDrawer();
+      if (kind === 'account') updateFocus();
       if (st.zone === Z.DETAILS && detailPick) {
         var latestPick = Data.currentPick(detailPick.imdbId || detailPick.id);
         if (latestPick) detailPick = latestPick;
         renderDetails(detailPick, false);
       }
     }
-    if (kind === 'weather' || kind === 'settings') renderPanels();
     if (st.zone === Z.SETTINGS) renderSettings();
     var status = Data.watchlistStatus();
     if (manualRefresh && !status.refreshing) {

@@ -4,20 +4,21 @@ const Watchlist = require('../web/watchlist');
 // Read-only enrichment of watchlist titles. Never crawl providers or change snapshots here.
 module.exports = function (config, getSnapshot, request) {
   const cache = new Map(), pending = new Map();
-  return function details(imdbId, done) {
-    const pick = getSnapshot()?.picks.find(item => item.imdbId === imdbId);
+  return function details(imdbId, done, account) {
+    const pick = getSnapshot(account)?.picks.find(item => item.imdbId === imdbId);
     if (!pick) { done(new Error('Title is no longer in the watchlist.')); return; }
     if ((pick.detailsLoaded && typeof pick.trailer === 'string' && pick.credits) || !config.tmdbKey) { done(null, pick); return; }
     if (cache.has(imdbId)) { done(null, {...pick, ...cache.get(imdbId)}); return; }
-    if (pending.has(imdbId)) { pending.get(imdbId).push(done); return; }
-    pending.set(imdbId, [done]);
+    if (pending.has(imdbId)) { pending.get(imdbId).push(deliver); return; }
+    pending.set(imdbId, [deliver]);
+    function deliver(error, metadata) { done(error, {...pick, ...metadata}); }
     function finish(error, metadata) {
       if (!error && metadata) {
         cache.set(imdbId, metadata);
         if (cache.size > 200) cache.delete(cache.keys().next().value);
       }
       const callbacks = pending.get(imdbId); pending.delete(imdbId);
-      callbacks.forEach(callback => callback(error, {...pick, ...metadata}));
+      callbacks.forEach(callback => callback(error, metadata));
     }
     const language = config.language && config.language !== 'auto' ? config.language : 'en';
     function tmdb(path, callback) {

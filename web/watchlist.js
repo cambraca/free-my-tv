@@ -382,10 +382,21 @@
     return picks;
   }
 
-  function sync(config, previous, request, progress, done, force) {
+  function withLibrary(config, snapshot, library) {
+    if (!snapshot || snapshot.plex && snapshot.plex.at >= library.at) return snapshot;
+    var updated = {};
+    Object.keys(snapshot).forEach(function (key) { updated[key] = snapshot[key]; });
+    updated.plex = library;
+    updated.updatedAt = Math.max(Date.now(), snapshot.updatedAt + 1);
+    updated.picks = picksFrom(config, snapshot.entries, library);
+    return updated;
+  }
+
+  function sync(config, previous, request, progress, done, force, sharedLibrary) {
     previous = valid(previous, config) ? previous : null;
     var warnings = [], entriesAt = 0, snapshotAt = previous ? previous.updatedAt : 0;
     function libraryData(callback) {
+      if (sharedLibrary) { sharedLibrary(callback); return; }
       if (!force && previous && plexLinksReady(previous) && watchedReady(previous) && fresh(previous.plex.at)) {
         callback(null, previous.plex); return;
       }
@@ -536,5 +547,5 @@
     availabilityReady: availabilityReady, watchedReady: watchedReady, clientSnapshot: clientSnapshot,
     trailer: trailer, credits: credits,
     crawl: crawl, scanPlex: scanPlex, plexTarget: plexTarget, providerLinks: providerLinks,
-    sync: sync, select: select, browse: browse};
+    sync: sync, withLibrary: withLibrary, select: select, browse: browse};
 });

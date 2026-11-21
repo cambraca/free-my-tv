@@ -17,3 +17,6 @@ __pycache__/
 # macOS
 .DS_Store
 tools/.i18n-cache.json
+
+# Personal IMDb profile avatars
+/web/profiles/

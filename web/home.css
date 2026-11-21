@@ -1,7 +1,7 @@
 /*
  * The home screen on a 1920 × 1080 stage, with the Android app's measurements (HomeView): the title and tabs at the top
  * left, icon-only glass buttons at the top right, three picks, and the glass shelf at the bottom; ↓ on the shelf opens
- * the scrollable watchlist with compact weather. Light by day, dark from sunset to sunrise.
+ * the scrollable watchlist. Light by day, dark from sunset to sunrise.
  * No CSS variables, grid or backdrop-filter: older LG TVs (webOS 3 and 4) don't have them, and blur is too heavy for
  * their GPUs. Only transform and opacity animate.
  */
@@ -43,6 +43,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 }
 
 .layer { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+
+body.browser-preview { overflow-y: auto; scrollbar-gutter: stable; }
+.browser-preview #stage { position: relative; }
 
 /* Symbols: Material Symbols as white PNGs, tinted by the background color. */
 .sym {
@@ -172,7 +175,13 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 .round .sym { position: absolute; left: 20px; top: 20px; width: 28px; height: 28px; }
-.round.focus { background: #FFF; -webkit-transform: scale(1.1); transform: scale(1.1); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24); }
+.round.focus,
+.round.profile[aria-pressed="true"] {
+  background: #FFF;
+  -webkit-transform: scale(1.1);
+  transform: scale(1.1);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
+}
 .round .tip {
   position: absolute;
   top: 88px;
@@ -195,8 +204,30 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   box-shadow: 0 6px 26px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.92);
 }
-.night .round.focus { background: #FFF; color: #1D1D1F; }
+.night .round.focus,
+.night .round.profile[aria-pressed="true"] { background: #FFF; color: #1D1D1F; }
 .night .round.focus .tip { color: #F5F5F7; }
+
+.profile .profile-face {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 50%;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 68px;
+}
+.profile-face img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+.round .profile-name {
+  width: 104px;
+  margin-left: -52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 1;
+}
+.night .profile .profile-name { color: #F5F5F7; }
 
 /* MARK: - Picks: a wide card and two tall ones; focused, a card grows 5%, rises and its edge lights up. */
 
@@ -353,18 +384,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night .tile { box-shadow: 0 4px 22px rgba(0, 0, 0, 0.3); }
 .night .tile.focus { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6); }
 
-/* MARK: - Scrollable watchlist and compact weather */
-
-.glass {
-  background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.66));
-  background: linear-gradient(rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.66));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1), inset 0 1.5px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-}
-.night .glass {
-  background: -webkit-linear-gradient(top, rgba(38, 38, 42, 0.78), rgba(17, 17, 19, 0.64));
-  background: linear-gradient(rgba(38, 38, 42, 0.78), rgba(17, 17, 19, 0.64));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 1.5px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
-}
+/* MARK: - Scrollable watchlist */
 
 #browse-window { position: absolute; left: 60px; top: 258px; width: 1800px; height: 782px; overflow: hidden; pointer-events: auto; }
 #browse-grid { position: absolute; left: 0; top: 0; width: 1800px; height: 998px; }
@@ -378,15 +398,6 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night .browse-card .meta { color: rgba(245, 245, 247, 0.62); }
 #browse-empty { position: absolute; left: 20px; top: 140px; right: 20px; text-align: center; font-size: 28px; color: #6E6E73; }
 .night #browse-empty { color: rgba(245, 245, 247, 0.62); }
-#weather-widget { position: absolute; right: 196px; top: 59px; width: 490px; height: 84px; border-radius: 24px; }
-#weather-widget .place { position: absolute; left: 22px; top: 13px; max-width: 230px; font-size: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#weather-widget .condition { position: absolute; left: 22px; top: 46px; max-width: 300px; font-size: 20px; color: #6E6E73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#weather-widget .current { position: absolute; right: 20px; top: 11px; height: 40px; white-space: nowrap; }
-#weather-widget .sym { width: 28px; height: 28px; vertical-align: 0; margin-right: 10px; }
-#weather-widget .temp { font-size: 37px; font-weight: 400; line-height: 42px; }
-#weather-widget .range { position: absolute; right: 22px; top: 54px; font-size: 18px; color: #6E6E73; }
-.night #weather-widget .condition, .night #weather-widget .range { color: rgba(245, 245, 247, 0.62); }
-.night #weather-widget { background: #242428; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
 
 /*
 #prices .coin { position: absolute; left: 34px; right: 34px; height: 40px; font-size: 29px; font-weight: 500; white-space: nowrap; }

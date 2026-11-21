@@ -66,6 +66,7 @@ def build(preview, config, profile):
     app_id = re.search(r'<tizen:application id="([^"]+)"', manifest).group(1)
     version = re.search(r'<widget [^>]*version="([^"]+)"', manifest).group(1)
     app = webapp.files(config, 'tizen/build.py')
+    app.pop('watchlist-service-seed.json')
     for name in ('config.xml', 'icon.png'):
         with open(os.path.join(ROOT, 'tizen', name), 'rb') as f:
             app[name] = f.read()

@@ -23,75 +23,59 @@ const bind = properties.preview_host || '127.0.0.1';
 const token = properties.preview_token || '';
 if (properties.tv_ip && !require('node:net').isIPv4(properties.tv_ip)) throw new Error('tv_ip must be an IPv4 address.');
 if (properties.preview_url && token.length < 24) throw new Error('TV bridge requires preview_token with at least 24 characters.');
-const remote = require('./preview-remote')({token, tvIp: properties.tv_ip || '', getState: () => ({config, snapshot, request})});
+const remote = require('./preview-remote')({token, tvIp: properties.tv_ip || '', getState: account => {
+  const state = lists.get(account);
+  return {config: state?.config || config, snapshot: state?.snapshot, request};
+}});
 const port = args.includes('--port') ? Number(args[args.indexOf('--port') + 1]) : Number(properties.preview_port || 43333);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be between 1 and 65535.');
 const clients = new Set();
 const mime = {'.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ttf': 'font/ttf'};
-let config, snapshot, snapshotPath, Watchlist, request;
+let config, lists, Watchlist, request;
 let torrents, titleDetails;
-let refreshing = false, attemptedAt = 0, lastError = '', building = false, queued = false, debounce;
+let building = false, queued = false, debounce;
 
 function load() {
   const content = fs.readFileSync(path.join(directory, 'config.js'), 'utf8');
   const publicConfig = JSON.parse(content.split('window.CONFIG = ')[1].trim().replace(/;$/, ''));
   const nextConfig = {...publicConfig, ...JSON.parse(fs.readFileSync(path.join(directory, 'watchlist-backend.json'), 'utf8'))};
-  for (const filename of ['./watchlist-network', '../web/watchlist', '../webos/service/qbittorrent', '../webos/service/plex-scan']) delete require.cache[require.resolve(filename)];
+  for (const filename of ['./watchlist-network', '../web/watchlist', '../webos/service/qbittorrent', '../webos/service/plex-scan', '../webos/service/watchlists']) delete require.cache[require.resolve(filename)];
   Watchlist = require('../web/watchlist');
   request = require('./watchlist-network');
-  const identity = crypto.createHash('sha256').update(JSON.stringify(nextConfig, Object.keys(nextConfig).filter(key => !['remoteUrl', 'remoteToken'].includes(key)).sort())).digest('hex').slice(0, 16);
-  snapshotPath = path.join(root, 'out', 'watchlist', 'snapshot-' + identity + '.json');
-  if (!config || Watchlist.source(config) !== Watchlist.source(nextConfig)) {
-    snapshot = null;
-    attemptedAt = 0;
-    lastError = '';
+  const cacheDirectory = path.join(root, 'out', 'watchlist');
+  fs.mkdirSync(cacheDirectory, {recursive: true});
+  function sortFields(key, value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+    return Object.fromEntries(Object.keys(value).sort().map(name => [name, value[name]]));
   }
-  if (snapshot && !Watchlist.valid(snapshot, nextConfig)) {
-    snapshot = null;
-    attemptedAt = 0;
-    lastError = '';
+  function pathFor(id) {
+    const settings = {...nextConfig, imdbUserId: id};
+    const keys = Object.keys(settings).filter(key => !['remoteUrl', 'remoteToken', 'imdbAccounts'].includes(key)).sort();
+    const identity = crypto.createHash('sha256').update(JSON.stringify(Object.fromEntries(keys.map(key => [key, settings[key]])), sortFields)).digest('hex').slice(0, 16);
+    return path.join(cacheDirectory, 'snapshot-' + identity + '.json');
   }
+  lists?.dispose();
   config = nextConfig;
+  lists = require('../webos/service/watchlists')(Watchlist, config, request, pathFor);
   delete require.cache[require.resolve('./preview-details')];
-  titleDetails = require('./preview-details')(config, () => snapshot, request);
-  torrents = require('../webos/service/qbittorrent')(config, path.join(root, 'out', 'watchlist', 'torrents.json'), () => snapshot, () => scanPlex());
-  attemptedAt = 0;
-  lastError = '';
-  try {
-    const cached = JSON.parse(fs.readFileSync(snapshotPath, 'utf8'));
-    if (Watchlist.valid(cached, config)) snapshot = cached;
-  } catch (error) {}
+  titleDetails = require('./preview-details')(config, account => lists.get(account)?.snapshot, request);
+  torrents = require('../webos/service/qbittorrent')(config, path.join(cacheDirectory, 'torrents.json'),
+    lists.torrentSnapshot, scanPlex, lists.complete);
 }
 
-function refresh(force) {
-  if (!config.imdbUserId || refreshing || (!force && Date.now() - attemptedAt < 600000)) return;
-  if (!force && snapshot && Watchlist.fresh(snapshot.updatedAt) && Watchlist.notesReady(snapshot)
-      && Watchlist.plexLinksReady(snapshot) && Watchlist.watchedReady(snapshot)
-      && Watchlist.availabilityReady(snapshot) && !snapshot.warnings.length) return;
-  refreshing = true;
-  attemptedAt = Date.now();
-  const currentConfig = config, currentPath = snapshotPath;
-  Watchlist.sync(currentConfig, snapshot, request, snapshot ? null : partial => {
-    if (config === currentConfig) snapshot = partial;
-  }, (error, result) => {
-    refreshing = false;
-    if (config !== currentConfig) return;
-    lastError = error ? error.message : '';
-    if (error) { console.error(lastError); return; }
-    snapshot = result;
-    fs.mkdirSync(path.dirname(currentPath), {recursive: true});
-    const temporary = currentPath + '.' + process.pid + '.tmp';
-    fs.writeFileSync(temporary, JSON.stringify(result));
-    fs.renameSync(temporary, currentPath);
-    console.log('Watchlist: ' + result.entries.length + ' titles, '
-      + result.picks.filter(pick => pick.options.length).length + ' available.');
-  }, force);
+function logRefresh(start) {
+  start(state => {
+    if (state.error) { console.error(state.error); return; }
+    console.log('Watchlist: ' + state.snapshot.entries.length + ' titles, '
+      + state.snapshot.picks.filter(pick => pick.options.length).length + ' available.');
+  });
 }
 
 function scanPlex() {
-  require('../webos/service/plex-scan')(config, request, () => refresh(true));
+  require('../webos/service/plex-scan')(config, request, () => lists.refreshAll(logRefresh));
 }
+
 setInterval(() => { if (torrents) torrents({action: 'status'}, () => {}); }, 60000).unref();
 
 function send(response, status, type, body) {
@@ -123,16 +107,18 @@ const server = http.createServer((incoming, response) => {
   }
   if (pathname === '/api/details') {
     if (incoming.method !== 'GET') { send(response, 405, 'text/plain', 'GET required'); return; }
-    const id = new URL(incoming.url, 'http://localhost').searchParams.get('id');
-    titleDetails(id, (error, pick) => send(response, pick ? 200 : 404, 'application/json',
-      JSON.stringify({pick, detailsError: error ? error.message : '', downloadsEnabled: !!config.qbitUrl})));
+    const query = new URL(incoming.url, 'http://localhost').searchParams;
+    titleDetails(query.get('id'), (error, pick) => send(response, pick ? 200 : 404, 'application/json',
+      JSON.stringify({pick, detailsError: error ? error.message : '', downloadsEnabled: !!config.qbitUrl})), query.get('account'));
     return;
   }
   if (pathname === '/api/watchlist') {
     const query = new URL(incoming.url, 'http://localhost').searchParams;
-    refresh(query.get('refresh') === '1');
-    const client = Watchlist.clientSnapshot(snapshot, query.get('source'), query.get('updatedAt'));
-    send(response, 200, 'application/json', JSON.stringify({returnValue: true, snapshot: client, refreshing, error: lastError}));
+    const state = lists.get(query.get('account'));
+    lists.refresh(state, query.get('refresh') === '1', logRefresh);
+    const client = Watchlist.clientSnapshot(state?.snapshot, query.get('source'), query.get('updatedAt'));
+    send(response, 200, 'application/json', JSON.stringify({returnValue: true, snapshot: client,
+      refreshing: !!state?.running, error: state?.error || ''}));
     return;
   }
   if (pathname === '/watchlist-backend.json' || pathname === '/watchlist-service-seed.json') { send(response, 403, 'text/plain', 'Forbidden'); return; }
@@ -150,7 +136,7 @@ const server = http.createServer((incoming, response) => {
     if (error) { send(response, 404, 'text/plain', 'Not found'); return; }
     if (pathname === '/config.js') content = content.toString() + '\nwindow.FMTV_PREVIEW = true;\n';
     if (pathname === '/' || pathname === '/index.html') {
-      content = content.toString().replace('</body>', '<script>new EventSource("/preview-events").onmessage = function () { location.reload(); };</script></body>');
+      content = content.toString().replace('width=1920, height=1080', 'width=device-width, initial-scale=1').replace('</body>', '<script>new EventSource("/preview-events").onmessage = function () { location.reload(); };</script></body>');
     }
     send(response, 200, mime[path.extname(filename)] || 'application/octet-stream', content);
   });

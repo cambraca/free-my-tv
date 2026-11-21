@@ -57,7 +57,7 @@ module.exports = function ({token, tvIp, getState}) {
         reply(res, 200, {ok: true});
       } else if (pathname === '/api/remote/command') {
         if (!waiting || pending) { reply(res, 409, {error: pending ? 'A TV command is still running.' : 'Open Free My TV on the TV first.'}); return; }
-        const state = getState();
+        const state = getState(payload.account);
         let command;
         if (payload.action === 'launch') {
           const pick = state.snapshot && state.snapshot.picks.find(item => item.imdbId === payload.imdbId);

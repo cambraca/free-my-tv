@@ -152,16 +152,35 @@ var Data = (function () {
     return null;
   }
 
-  var snapshot = stored('watchlist');
-  var seed = window.WATCHLIST_SEED;
-  if (!Watchlist.valid(snapshot, CONFIG)) snapshot = null;
-  if (Watchlist.valid(seed, CONFIG) && (!snapshot || seed.updatedAt > snapshot.updatedAt)) snapshot = seed;
-  seed = null;
-  window.WATCHLIST_SEED = null;
-  var localWatched = stored('watched');
-  if (!localWatched || localWatched.source !== Watchlist.source(CONFIG) || !localWatched.ids) {
-    localWatched = {source: Watchlist.source(CONFIG), ids: {}};
+  var accounts = CONFIG.imdbAccounts || (CONFIG.imdbUserId ? [{id: CONFIG.imdbUserId, name: CONFIG.imdbUserId}] : []);
+  var seeds = window.WATCHLIST_SEEDS || {}, watchConfig = {}, snapshot, localWatched, watchSource;
+  Object.keys(CONFIG).forEach(function (key) { watchConfig[key] = CONFIG[key]; });
+
+  function accountStored(key) {
+    var value = stored(key + '.' + watchSource);
+    if (value) return value;
+    var legacy = stored(key);
+    if (legacy && legacy.source === watchSource) {
+      store(key + '.' + watchSource, legacy);
+      return legacy;
+    }
+    return null;
   }
+
+  function loadAccount(id) {
+    watchConfig.imdbUserId = id;
+    watchSource = Watchlist.source(watchConfig);
+    snapshot = accountStored('watchlist');
+    var seed = seeds[id] || window.WATCHLIST_SEED;
+    if (!Watchlist.valid(snapshot, watchConfig)) snapshot = null;
+    if (Watchlist.valid(seed, watchConfig) && (!snapshot || seed.updatedAt > snapshot.updatedAt)) snapshot = seed;
+    localWatched = accountStored('watched');
+    if (!localWatched || !localWatched.ids) localWatched = {source: watchSource, ids: {}};
+  }
+
+  var initialAccount = stored('imdbAccount');
+  loadAccount(accounts.some(function (account) { return account.id === initialAccount; })
+    ? initialAccount : accounts.length ? accounts[0].id : '');
 
   function isWatched(pick) {
     if (localWatched.ids[pick.imdbId || pick.id]) return true;
@@ -185,11 +204,12 @@ var Data = (function () {
   function markWatched(pick) {
     if (!pick || isWatched(pick)) return;
     localWatched.ids[pick.imdbId || pick.id] = true;
-    store('watched', localWatched);
+    store('watched.' + watchSource, localWatched);
     catalogs = {};
     browseCatalogs = {};
     changed('watchlist');
   }
+  var accountGeneration = 0;
   var fetchingRecs = false, pollingRecs = false, pollTimer = 0, recsError = '';
   var active = !document.hidden, nextRecsAt = 0, savedRecsAt = snapshot ? snapshot.updatedAt : 0;
   var sessionSeed = '', sessionAt = 0, catalogs = {}, browseCatalogs = {}, featuredSeed = '', sessionFeatured = {};
@@ -198,8 +218,8 @@ var Data = (function () {
     var seed = String(Math.floor(Date.now() / (20 * 60000)));
     if (seed === featuredSeed) return false;
     featuredSeed = seed;
-    var previous = stored('featured');
-    sessionFeatured = previous && previous.source === Watchlist.source(CONFIG) && previous.seed === seed
+    var previous = accountStored('featured');
+    sessionFeatured = previous && previous.source === watchSource && previous.seed === seed
       ? previous.tabs || {} : {};
     catalogs = {};
     return true;
@@ -265,7 +285,7 @@ var Data = (function () {
       var ids = chosen.map(function (pick) { return pick.id; });
       if (JSON.stringify(ids) !== JSON.stringify(sessionFeatured[key])) {
         sessionFeatured[key] = ids;
-        store('featured', {source: Watchlist.source(CONFIG), seed: featuredSeed, tabs: sessionFeatured});
+        store('featured.' + watchSource, {source: watchSource, seed: featuredSeed, tabs: sessionFeatured});
       }
     }
     return catalogs[key];
@@ -285,12 +305,31 @@ var Data = (function () {
     return browseCatalogs[key];
   }
 
+  function switchAccount(id) {
+    if (id === watchConfig.imdbUserId || !accounts.some(function (account) { return account.id === id; })) return;
+    accountGeneration++;
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = 0; }
+    fetchingRecs = pollingRecs = false;
+    recsError = '';
+    nextRecsAt = 0;
+    loadAccount(id);
+    store('imdbAccount', id);
+    savedRecsAt = snapshot ? snapshot.updatedAt : 0;
+    featuredSeed = '';
+    refreshFeaturedWindow();
+    browseCatalogs = {};
+    changed('account');
+    refreshRecs(false);
+  }
+
   function refreshRecs(force) {
-    if (!active || fetchingRecs || !CONFIG.imdbUserId || (!TV.isWebOS && !TV.isPreview)) return;
+    if (!active || fetchingRecs || !watchConfig.imdbUserId || (!TV.isWebOS && !TV.isPreview)) return;
     if (!force && Date.now() < nextRecsAt) return;
     if (pollTimer) { clearTimeout(pollTimer); pollTimer = 0; }
     fetchingRecs = true;
+    var generation = accountGeneration;
     TV.watchlist(function (result) {
+      if (generation !== accountGeneration) return;
       var wasPolling = pollingRecs, previousError = recsError, updated = false;
       fetchingRecs = false;
       if (!result) {
@@ -301,7 +340,7 @@ var Data = (function () {
         changed('status');
         return;
       }
-      if (Watchlist.valid(result.snapshot, CONFIG) && (!snapshot || snapshot.updatedAt !== result.snapshot.updatedAt)) {
+      if (Watchlist.valid(result.snapshot, watchConfig) && (!snapshot || snapshot.updatedAt !== result.snapshot.updatedAt)) {
         snapshot = result.snapshot;
         catalogs = {};
         browseCatalogs = {};
@@ -310,13 +349,13 @@ var Data = (function () {
       recsError = result.error || snapshot && (snapshot.warnings || []).join(' ') || '';
       pollingRecs = !!result.refreshing;
       if (snapshot && !pollingRecs && savedRecsAt !== snapshot.updatedAt) {
-        store('watchlist', snapshot);
+        store('watchlist.' + watchSource, snapshot);
         savedRecsAt = snapshot.updatedAt;
       }
       nextRecsAt = Date.now() + (pollingRecs ? 15000 : 5 * 60000);
       if (updated || force || wasPolling !== pollingRecs || previousError !== recsError) changed(updated ? 'watchlist' : 'status');
       if (pollingRecs && active) pollTimer = setTimeout(function () { refreshRecs(false); }, 15000);
-    }, force, snapshot);
+    }, force, snapshot, watchConfig.imdbUserId);
   }
 
   function all() {
@@ -376,6 +415,9 @@ var Data = (function () {
     onChange: function (fn) { listeners.push(fn); },
     setApps: function (apps) { installed = apps; catalogs = {}; browseCatalogs = {}; },
     startSession: startSession,
+    accounts: accounts,
+    activeAccount: function () { return watchConfig.imdbUserId; },
+    switchAccount: switchAccount,
     refreshWatchlist: function () { refreshRecs(true); changed('status'); },
     setActive: function (value) {
       active = value;
@@ -393,7 +435,7 @@ var Data = (function () {
     get weather() { return weather; },
     get weatherAt() { return weatherAt; },
     watchlistStatus: function () {
-      return {configured: !!CONFIG.imdbUserId, refreshing: fetchingRecs || pollingRecs,
+      return {configured: !!watchConfig.imdbUserId, refreshing: fetchingRecs || pollingRecs,
         total: snapshot ? snapshot.entries.length : 0,
         available: snapshot ? snapshot.picks.filter(function (pick) { return pick.options.length > 0; }).length : 0,
         loaded: !!snapshot, error: recsError || snapshot && (snapshot.warnings || []).join(' ') || ''};

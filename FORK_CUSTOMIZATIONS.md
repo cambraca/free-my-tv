@@ -46,7 +46,7 @@ Key files: `web/data.js`, `web/home.js`, `web/home.css`, `web/index.html`, `tool
 ### TV inputs and Live TV
 
 - The shared web launcher has no HDMI, antenna, other TV-input, or Live TV shortcut, discovery call, or selection
-  menu. The only top-right action is Settings, beside the compact weather widget.
+  menu. The top-right controls are Settings and the IMDb account circles when several accounts are configured.
 - Keep input/source launch paths commented out and keep filtering these entries out of All Apps. Hiding buttons
   alone is not enough if a merge exposes the same inputs elsewhere.
 - The **TV Settings** action is intentional and stays available. It is not a Live TV shortcut.
@@ -70,8 +70,8 @@ whose service apps are not installed. Plex movies are watched when `viewCount` i
 when every available episode has been watched (`viewedLeafCount >= leafCount`, with a positive episode count).
 Partially watched shows remain in the normal tabs. Preserve these flags in Plex library caches and client picks.
 Old nonempty Plex caches without `watchedVersion: 1` trigger a background scan while retaining complete data on failure.
-The detail popup's **Mark as watched** action stores a local IMDb-ID flag in `fmtv.watched`, scoped to the configured
-watchlist source. This flag survives snapshot refreshes and app restarts, without changing Plex or IMDb. Hide the
+The detail popup's **Mark as watched** action stores a local IMDb-ID flag under `fmtv.watched.<source>`, scoped to the active
+IMDb watchlist source. This flag survives snapshot refreshes and app restarts, without changing Plex or IMDb. Hide the
 action for already watched titles, and exclude watched titles from all other tabs and the slideshow. Watched uses
 weighted featured picks and a newest-addition-first grid, retaining the same navigation and rendering bounds.
 
@@ -79,7 +79,8 @@ Configuration belongs in the ignored local `config.properties`; `config.example.
 
 | Key | Contract |
 | --- | --- |
-| `imdb_user_id` | Public IMDb user/profile ID, either `ur...` or `p....`, not a full watchlist URL. |
+| `imdb_user_id` | One or more comma-separated public IMDb user/profile IDs (`ur...` or `p....`). |
+| `imdb_name` | Optional comma-separated display names in ID order. A blank or missing name falls back to the ID. |
 | `watchlist_services` | Comma-separated `netflix`, `mubi`, and/or `plex`; default `netflix,mubi,plex`. |
 | `tmdb_key` | Private TMDB key or read-access token for metadata and subscription availability. |
 | `tmdb_region` | Two-letter country used for subscription availability; do not assume the US. |
@@ -90,6 +91,14 @@ Configuration belongs in the ignored local `config.properties`; `config.example.
 Keep the local values local; do not hard-code the user's IMDb ID, Plex address, or tokens into sources or new
 documentation. Native Android's newer upstream `watchmode_key`, `hide_services`, and `hide_animation` options remain
 available there; they do not replace the web watchlist matcher or add a generic recommendation fallback.
+
+Use `web/profiles/user1.jpg`, `web/profiles/user2.jpg`, and so on for optional square avatars in config order.
+Personal builds bundle the referenced files. Missing images use initials, and generic packages exclude personal
+avatars. The selector shows all configured accounts together, with a larger avatar for the active one. The last
+selection is stored by IMDb ID, so reordering the config preserves the selected account. The first configured
+account is the default. Switching swaps the source for every tab, featured picks, title notes, and slideshow.
+Plex availability and Plex watch history are shared, while local **Mark as watched** flags belong to the IMDb
+account. qBittorrent has one shared job and search backend across the configured watchlists.
 
 ### Complete public watchlist crawling
 
@@ -128,15 +137,18 @@ Preserve all three persistence layers, rather than making every app launch wait 
 1. `tools/sync-watchlist.js`, called through `tools/webapp.py`, preloads data during builds. The private build cache
    is `out/watchlist/snapshot-<config-hash>.json`. Bundle the client seed and the full service seed for first launch.
 2. The packaged `io.freemytv.watchlist` webOS service refreshes stale data independently of the UI using an
-   ActivityManager activity. Its durable cache is `/media/internal/io.freemytv.watchlist.json`.
+   ActivityManager activity. It stores per-ID caches at `/media/internal/io.freemytv.watchlist-<id>.json` and
+   can read the old single-account cache if its source matches.
 3. The UI uses `localStorage` for the watchlist and preferences. Bundled seeds remain important because installed
-   app updates can clear web storage. Validate source/config identity before reusing any snapshot.
+   app updates can clear web storage. The browser copies legacy watchlist, watched, and featured records to
+   their source-specific keys only when the source matches the selected account.
 
 Normal freshness is six hours, with throttled retries after failures; manual refresh bypasses freshness checks.
 The preview backend uses the same matching code and private build cache. Tizen receives the bundled snapshot but
 does not have the webOS Luna background service.
 
-Automatic retries reuse a successful Plex scan for up to six hours; a manual refresh always scans it again.
+Automatic retries reuse a successful shared Plex scan for up to six hours. Manual refresh recrawls the active
+IMDb account and scans Plex again. New Plex data updates cached matches across accounts.
 Keep the last displayed snapshot stable until a background job completes. Progress snapshots are useful only on
 the first load without cached data, and are emitted at most once every five seconds after the initial snapshot.
 
@@ -218,13 +230,14 @@ These two selection policies are deliberately different. Do not share one orderi
 - The main app shelf is smaller and lower than upstream's original layout, with space below the featured row.
   Current measurements on the 1920×1080 stage: tiles at most 220px wide and 104px high, 32px gaps, platter at y=878
   with height 150px, tile y=901, focused scale 1.12. Preserve the compact appearance when adapting upstream sizing.
-- Dark mode needs light inherited text for the title/grid/weather, appropriate muted secondary text, a legible
-  dark weather surface, and inverted duck artwork. Check both themes; removing explicit colors can regress this.
+- Dark mode needs light inherited text for the title and grid, appropriate muted secondary text, and inverted duck artwork. Check both themes; removing explicit colors can regress this.
 
 ### Two pages and TV-friendly cards
 
-- The top/featured page contains the title, five tabs, three featured titles, and app shelf. A compact weather
-  widget sits immediately left of Settings at the top-right.
+- The top/featured page contains the title, five tabs, three featured titles, and app shelf. The IMDb account circles
+  sit to the left of Settings with wider gaps. Their names use the Settings label typography. The selected
+  circle keeps the same appearance as a focused circle and is skipped by pointer and remote navigation. The
+  weather widget is hidden. Sunrise and sunset data still drive automatic dark mode.
 - All three featured cards show metadata. The large card includes genre; the two narrower cards omit genres,
   showing only year, runtime/show count, and service on a single line.
 - Down from the shelf opens the selected tab's larger watchlist grid. The app shelf stays pinned above it.
@@ -304,8 +317,7 @@ The web popup is called **Settings**, not **Home Settings**. Its visible rows ar
 5. Shelf
 6. TV Settings
 
-Language, Temperature, and Weather widget controls are intentionally hidden here, not removed from configuration
-or preferences. Crypto controls are disabled, not merely hidden. Preserve focus-row indices and the return from
+Language, Temperature, and Weather controls are intentionally absent from this menu. Crypto controls are disabled, not merely hidden. Preserve focus-row indices and the return from
 the shelf editor after changing settings. Android keeps its separate native settings layout.
 
 Key files: `web/index.html`, `web/home.js`, `web/home.css`, `web/data.js`, `web/strings.js`, `web/logos/`,
@@ -470,7 +482,7 @@ The first upstream merge needed these specific combinations; future merges must 
   includes Forecast, Now Playing, optional Home Assistant, keys, and Updates with their current indices; crypto rows
   and their unused catalogue strings stay removed.
 - Upstream's web UI additions that conflict with the fixed six-row Settings menu, three cards, watchlist source,
-  compact weather/shelf, and manual slideshow remain replaced by the fork implementations. Keep the inline
+  compact shelf, hidden weather widget, and manual slideshow remain replaced by the fork implementations. Keep the inline
   `tr(pt, en, es)` API and its existing hand translations; the catalogue extractor skips these legacy calls.
 - Keep upstream low-memory `lite`/`flat` rendering, Samsung DIAL/Smart Hub launch fixes and app filtering,
   webOS HD packaging, and locally bundled app discovery. MUBI remains in known-app discovery.
@@ -493,7 +505,7 @@ The first upstream merge needed these specific combinations; future merges must 
    sufficient, or without `--no-watchlist-sync` when intentionally testing a real sync. Run `./build.sh` only when
    Android validation is needed and the SDK/JDK are available; it deletes `out/`, including the web build/cache.
 5. Smoke-test the local HTTP preview: three watchlist picks, four grid columns, correct per-tab order, compact
-   shelf, top-page weather, focused notes, readable dark mode, and exactly the intended Settings options. Reopen
+   shelf, account switching, focused notes, readable dark mode, and exactly the intended Settings options. Reopen
    the app and verify the featured picks refresh without resetting the tab.
 6. For matching/refresh changes, verify full pagination, watchlist removals, Plex removals, confirmed empty data,
    offline/malformed/partial Plex responses retaining the last complete library, and forced-refresh propagation.
@@ -529,7 +541,8 @@ The first upstream merge needed these specific combinations; future merges must 
 - Keep credentials out of generated client config. The private backend config is packaged only in the webOS
   service; preview refuses HTTP access to backend config/seed. Personal packages remain private.
 - Persist title/season links and unique qBittorrent tags atomically in `/media/internal/io.freemytv.torrents.json`
-  (preview: `out/watchlist/torrents.json`). Recover torrent hashes from those tags. Downloads explicitly start,
+  (preview: `out/watchlist/torrents.json`). Recover torrent hashes from those tags. Job cache identity uses the qBittorrent server. Migrate old caches
+  when their IMDb ID matches any configured account. Downloads explicitly start,
   with automatic torrent management off so configured destinations are honored. Add new TV-show torrents
   with `sequentialDownload=true`; omit this option for movies. This prioritizes the torrent’s internal piece
   order, not guaranteed episode completion order. Do not modify existing torrents. Never delete torrents/files.
@@ -551,11 +564,13 @@ The first upstream merge needed these specific combinations; future merges must 
   never blocks startup or normal offline behavior. Generic builds have no bridge credentials.
 - Modern phone assets live under `tools/phone/`, served only by the preview; preserve ES5 TV assets and the original
   fixed-stage layout. Preview user-agent detection selects remote mode for recognizable phones and computers,
-  TV mode for TV agents, and defaults to TV mode when unclear. `?mode=tv` and `?mode=remote` override detection;
+  TV mode for TV agents, and defaults to TV mode when unclear. The browser uses the full available width. The TV preview scales
+  proportionally and can scroll vertically, and the remote preview adds title columns as space allows. Remote
+  profile circles sit immediately to the left of **TV layout**, with a bold name for the active account. `?mode=tv` and `?mode=remote` override detection;
   preserve old `?remote=1` bookmarks. Detection never changes the installed TV app. Keep the connection status
   small, muted and close to the content, with no empty status space. Suppress optional metadata failure labels. Tapping any phone title always opens its details first; only the popup’s service action sends a
-  launch command. Phone details fill the screen with 16:9 landscape artwork (poster fallback), a sticky
-  Back action. Keep year/season metadata, genres and rating immediately below the title, followed by
+  launch command. Phone details fill the screen with a sticky Back action and centered 16:9 landscape artwork (poster fallback)
+  capped at 760px wide. Keep year/season metadata, genres and rating immediately below the title, followed by
   service/search actions. Place Plex-season status, download progress and related errors directly beneath
   those actions, above credits and synopsis. Hide broken artwork and respect phone safe areas.
   Match TV detail information: movie/show badge, genre chips, TMDB rating, directors/creators, cast, season

@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 node tests/WebPrefsTest.js
+node tests/WatchlistAccountsTest.js
 node tests/TorrentSearchViewTest.js
 
 node tests/RemoteReceiverTest.js
