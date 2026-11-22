@@ -33,7 +33,7 @@ const clients = new Set();
 const mime = {'.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ttf': 'font/ttf'};
 let config, lists, Watchlist, request;
-let torrents, titleDetails;
+let torrents, titleDetails, titleRatings;
 let building = false, queued = false, debounce;
 
 function load() {
@@ -60,6 +60,7 @@ function load() {
   lists = require('../webos/service/watchlists')(Watchlist, config, request, pathFor);
   delete require.cache[require.resolve('./preview-details')];
   titleDetails = require('./preview-details')(config, account => lists.get(account)?.snapshot, request);
+  titleRatings ||= require('../webos/service/title-ratings')(request, path.join(cacheDirectory, 'ratings.json'));
   torrents = require('../webos/service/qbittorrent')(config, path.join(cacheDirectory, 'torrents.json'),
     lists.torrentSnapshot, scanPlex, lists.complete);
 }
@@ -103,6 +104,13 @@ const server = http.createServer((incoming, response) => {
       let payload; try { payload = JSON.parse(body); } catch (error) { send(response, 400, 'text/plain', 'Bad request'); return; }
       torrents(payload, (error, result) => send(response, 200, 'application/json', JSON.stringify(error ? {error: error.message} : result)));
     });
+    return;
+  }
+  if (pathname === '/api/ratings') {
+    if (incoming.method !== 'GET') { send(response, 405, 'text/plain', 'GET required'); return; }
+    const query = new URL(incoming.url, 'http://localhost').searchParams;
+    const pick = lists.get(query.get('account'))?.snapshot?.picks.find(item => item.imdbId === query.get('id'));
+    titleRatings(pick, config, ratings => send(response, 200, 'application/json', JSON.stringify({ratings})));
     return;
   }
   if (pathname === '/api/details') {

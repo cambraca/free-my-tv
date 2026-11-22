@@ -444,6 +444,8 @@ body.browser-preview { overflow-y: auto; scrollbar-gutter: stable; }
 .detail-genres span { display: inline-block; margin: 0 10px 10px 0; padding: 8px 16px; border-radius: 9px; background: rgba(128, 138, 154, 0.12); font-size: 23px; }
 .detail-rating { margin-top: 12px; font-size: 28px; color: #9B6A16; }
 .night .detail-rating { color: #EDC576; }
+.detail-rating:empty { display: none; }
+.detail-rating > * { display: inline-block; margin-right: 20px; }
 .detail-credits { margin-top: 20px; font-size: 26px; line-height: 1.45; }
 .detail-credit { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-height: 2.9em; overflow: hidden; }
 .detail-credit + .detail-credit { margin-top: 6px; }

@@ -391,8 +391,10 @@ var Data = (function () {
         for (var name in pick) if (pick.hasOwnProperty(name)) result[name] = pick[name];
         result.poster = detail.poster_path ? 'https://image.tmdb.org/t/p/w500' + detail.poster_path : pick.poster || '';
         result.overview = detail.overview || '';
+        result.tmdbId = detail.id;
         result.genres = (detail.genres || []).map(function (genre) { return genre.name; });
-        result.rating = detail.vote_count > 0 ? Number(detail.vote_average) || 0 : 0;
+        result.rating = detail.vote_count > 0 ? Number(detail.vote_average) : null;
+        result.tmdbRatingCheckedAt = Date.now();
         result.trailer = Watchlist.trailer(detail.videos, I18N.lang);
         result.credits = Watchlist.credits(detail, pick.kind);
         result.detailsLoaded = true;
@@ -446,6 +448,14 @@ var Data = (function () {
     checkWatchlist: function () { nextRecsAt = 0; refreshRecs(false); },
     currentPick: function (id) { return snapshot && snapshot.picks.filter(function (p) { return (p.imdbId || p.id) === id; })[0]; },
     details: details,
+    ratings: function (pick, done) {
+      if (TV.isWebOS) { TV.titleRatings(pick.imdbId, done); return; }
+      if (!TV.isPreview) return;
+      get('/api/ratings?id=' + encodeURIComponent(pick.imdbId) + '&account='
+        + encodeURIComponent(watchConfig.imdbUserId || ''), {}, function (error, result) {
+        if (!error && result) done(result.ratings);
+      });
+    },
     isWatched: isWatched,
     markWatched: markWatched,
     catalog: catalog,

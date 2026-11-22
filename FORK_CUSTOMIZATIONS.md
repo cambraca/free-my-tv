@@ -265,7 +265,7 @@ These two selection policies are deliberately different. Do not share one orderi
   particular service or Plex server. Hide missing/zero counts. Old cached titles gain counts on the next normal
   metadata refresh or **Settings → Refresh IMDb and Plex**, preserving immediate startup and existing caches.
 - Unavailable title details use a large portrait poster on the left and a scrollable title, metadata, genre chips,
-  TMDB rating, synopsis, and IMDb note on the right. Keep TV-sized text and readable light/dark themes. There is
+  rating row, synopsis, and IMDb note on the right. Keep TV-sized text and readable light/dark themes. There is
   no Back button, no Unavailable badge, and no “not available on…” message. The remote's Back restores the exact
   featured/grid selection; arrows, Page Up/Down, and the pointer wheel scroll the description without moving
   the grid underneath. Ignore late detail responses after closing or selecting another title.
@@ -293,6 +293,15 @@ These two selection policies are deliberately different. Do not share one orderi
 - Retain poster/synopsis/genres/rating/TMDB ID in cached picks. An older cache can fetch just the selected title's
   details on demand (exact IMDb lookup if its TMDB ID is missing), with coalesced requests and a session cache;
   do not recrawl the watchlist or block opening the detail page. Missing artwork/synopses have graceful fallbacks.
+- Show ratings in one compact row, for example **★ 7.6 IMDb**, **★ 78% TMDB**, **★ 92% Rotten Tomatoes**,
+  and **★ 74 Metacritic**.
+  In the responsive preview the scores are non-underlined links that open the exact title pages in a new tab.
+  TV mode renders plain text in the browser and on the installed TV app. Keep a last-checked timestamp per
+  title and source. IMDb and TMDB scores travel with the
+  watchlist snapshot. Opening details also checks scores that are at least a week old or have no timestamp.
+  The preview and webOS backends resolve Rotten Tomatoes and Metacritic via Wikidata's exact title IDs, then
+  read the Tomatometer and the whole-title Metascore from the matched pages. Omit missing scores and ambiguous matches. Persist detail lookups,
+  keep the last score after a failed refresh, and load scores independently of title details and provider refresh.
 - Detail popups include compact text credits above the synopsis: up to two directors for movies or two creators
   for shows, plus the first four billed cast members. Deduplicate names and omit missing rows; keep each row to
   at most two lines, with no portraits or character biographies. Credits inherit the theme and scroll with the
@@ -442,8 +451,12 @@ builds the webOS preview, watches source/configuration changes, and rebuilds/rel
   preview, use `node tools/preview.js --no-build`; this also watches for changes. `--port` and `--config` are supported.
 - Preview rebuilds use `--no-watchlist-sync` so editing CSS/JS does not synchronously recrawl the whole watchlist.
   The backend refreshes stale data separately, avoiding browser cross-origin restrictions for IMDb and Plex.
+- Both browser preview layouts keep the selected tab and open IMDb title ID in the URL fragment, for example
+  `#tab=movie&title=tt1375666`. Reloads restore the title once it is available in the active watchlist. Closing
+  details clears the title from the fragment and keeps the tab.
 - Default to localhost. Explicit `preview_host=0.0.0.0` enables LAN access without a browser login. The installed TV bridge still uses a `preview_token` of at least 24 characters. Generated config and caches can contain credentials and personal data.
-  Restart the server after changing `tools/preview.js` itself; a browser reload does not reload the server process.
+  Restart the server after changing `tools/preview.js` or the title-ratings backend. A browser reload only
+  reloads the page.
 - Keep atomic per-file preview output writes. Deleting the entire preview directory on each rebuild caused races
   with concurrent watchers and requests.
 - Package web subdirectories recursively, including both this fork's `web/logos/` and upstream's `web/icons/`.
@@ -569,11 +582,12 @@ The first upstream merge needed these specific combinations; future merges must 
   profile circles sit immediately to the left of **TV layout**, with a bold name for the active account. `?mode=tv` and `?mode=remote` override detection;
   preserve old `?remote=1` bookmarks. Detection never changes the installed TV app. Keep the connection status
   small, muted and close to the content, with no empty status space. Suppress optional metadata failure labels. Tapping any phone title always opens its details first; only the popup’s service action sends a
-  launch command. Phone details fill the screen with a sticky Back action and centered 16:9 landscape artwork (poster fallback)
-  capped at 760px wide. Keep year/season metadata, genres and rating immediately below the title, followed by
+  launch command. Phone details use the full window width with a sticky Back action. Portrait windows show 16:9
+  artwork (poster fallback) above the details. Landscape windows show the poster on the left and details on the
+  right. Keep year/season metadata, genres and ratings immediately below the title, followed by
   service/search actions. Place Plex-season status, download progress and related errors directly beneath
   those actions, above credits and synopsis. Hide broken artwork and respect phone safe areas.
-  Match TV detail information: movie/show badge, genre chips, TMDB rating, directors/creators, cast, season
+  Match TV detail information: movie/show badge, genre chips, ratings, directors/creators, cast, season
   or episode counts, synopsis, labeled watchlist note, and configured download/Plex-season status. Enrich older
   cached titles through `/api/details`, retaining cached content on errors. Ignore responses after
   the user closes details or selects another title. This endpoint is read-only and must not refresh providers.

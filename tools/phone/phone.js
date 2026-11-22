@@ -3,7 +3,9 @@
 if (globalThis.APP_VERSION) document.getElementById('brand-version').textContent = 'v' + globalThis.APP_VERSION;
 const status = document.getElementById('status');
 const connectionStatus = document.getElementById('connection');
-let picks = [], tab = 'all', busy = false, limit = 40, detailGeneration = 0, torrentPanel = null;
+const previewLocation = PreviewLocation.read();
+let picks = [], tab = previewLocation.tab || 'all', titleToRestore = previewLocation.title;
+let busy = false, limit = 40, detailGeneration = 0, torrentPanel = null;
 const accounts = globalThis.IMDB_ACCOUNTS || [];
 const accountKey = 'fmtv.imdbAccount';
 function stored(key) {
@@ -38,6 +40,8 @@ function renderProfiles() {
       if (activeAccount === profile.id) return;
       activeAccount = profile.id;
       accountGeneration++;
+      titleToRestore = '';
+      PreviewLocation.write(tab);
       try { localStorage.setItem(accountKey, JSON.stringify(activeAccount)); } catch (error) {}
       picks = []; limit = 40;
       connectionStatus.textContent = 'Loading watchlist…';
@@ -64,19 +68,22 @@ async function command(payload) {
   finally { busy = false; }
 }
 function element(tag, text) { const node = document.createElement(tag); node.textContent = text; return node; }
-function renderDetails(pick) {
+function renderDetails(pick, ratings) {
   const dialog = document.getElementById('details');
   const content = document.getElementById('detail-content');
   content.replaceChildren();
-  const artwork = pick.backdrop || pick.poster;
-  if (artwork) {
+  function addArtwork(src, className) {
+    if (!src) return;
     const image = document.createElement('img');
-    image.className = 'detail-art' + (pick.backdrop ? '' : ' poster-fallback');
-    image.src = artwork;
+    image.className = 'detail-art ' + className;
+    image.loading = 'lazy';
+    image.src = src;
     image.alt = '';
     image.onerror = () => { image.hidden = true; };
     content.append(image);
   }
+  addArtwork(pick.backdrop || pick.poster, 'detail-portrait-art' + (pick.backdrop ? '' : ' poster-fallback'));
+  addArtwork(pick.poster, 'detail-poster');
   const copy = element('div', ''); copy.className = 'detail-copy';
   const title = element('h2', pick.title); title.id = 'detail-title';
   const badge = element('p', pick.kind === 'tv' ? 'TV show' : 'Movie'); badge.className = 'detail-badge';
@@ -90,7 +97,8 @@ function renderDetails(pick) {
   if (metadata.length) { const meta = element('p', metadata.join(' · ')); meta.className = 'detail-meta'; copy.append(meta); }
   const genreRow = element('div', ''); genreRow.className = 'detail-genres';
   genres.forEach(genre => genreRow.append(element('span', genre))); copy.append(genreRow);
-  if (pick.rating > 0) { const rating = element('p', '★ ' + Number(pick.rating).toFixed(1) + ' / 10 · TMDB'); rating.className = 'detail-rating'; copy.append(rating); }
+  const ratingRow = element('p', ''); ratingRow.className = 'detail-rating'; ratingRow.id = 'detail-ratings';
+  TitleRatings.render(ratingRow, pick, ratings, true); copy.append(ratingRow);
   const actions = element('div', ''); actions.id = 'detail-actions'; actions.className = 'detail-actions';
   copy.append(actions);
   content.append(copy);
@@ -112,16 +120,26 @@ function renderDetails(pick) {
   if (pick.note) { const note = element('div', ''); note.className = 'detail-note'; note.append(element('strong', 'Your note'), element('p', pick.note)); copy.append(note); }
 }
 async function details(pick) {
+  titleToRestore = '';
+  PreviewLocation.write(tab, pick.imdbId);
   torrentPanel?.dispose(); torrentPanel = null;
   const generation = ++detailGeneration, dialog = document.getElementById('details');
   renderDetails(pick);
   document.body.classList.add('details-open'); dialog.showModal(); dialog.scrollTop = 0;
   const current = () => generation === detailGeneration && dialog.open;
+  const titleQuery = '?id=' + encodeURIComponent(pick.imdbId) + (activeAccount ? '&' + accountQuery() : '');
+  let detailedPick = pick, ratings;
+  json('/api/ratings' + titleQuery).then(data => {
+    if (!current()) return;
+    ratings = data.ratings;
+    TitleRatings.render(document.getElementById('detail-ratings'), detailedPick, ratings, true);
+  }).catch(() => {});
   try {
-    const data = await json('/api/details?id=' + encodeURIComponent(pick.imdbId) + (activeAccount ? '&' + accountQuery() : ''));
+    const data = await json('/api/details' + titleQuery);
     if (!current()) return;
     const scroll = dialog.scrollTop;
-    renderDetails(data.pick || pick); dialog.scrollTop = scroll;
+    detailedPick = data.pick || pick;
+    renderDetails(detailedPick, ratings); dialog.scrollTop = scroll;
     const progress = document.getElementById('detail-progress');
     if (data.downloadsEnabled) {
       torrentPanel = PhoneTorrents({pick: data.pick || pick, dialog, content: document.getElementById('detail-content'),
@@ -152,15 +170,22 @@ function render() {
   if (matching.length > limit) { const more = element('button', 'Show more'); more.onclick = () => { limit += 40; render(); }; list.append(more); }
   if (!list.children.length) list.append(element('p', 'No matching titles.'));
 }
-document.getElementById('details').addEventListener('close', () => { detailGeneration++; torrentPanel?.dispose(); torrentPanel = null; document.body.classList.remove('details-open'); });
+document.getElementById('details').addEventListener('close', () => {
+  detailGeneration++; torrentPanel?.dispose(); torrentPanel = null; document.body.classList.remove('details-open');
+  PreviewLocation.write(tab);
+});
 document.getElementById('close').onclick = () => {
   if (torrentPanel?.searching) torrentPanel.back();
   else document.getElementById('details').close();
 };
 document.getElementById('search').oninput = () => { limit = 40; render(); };
-document.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => {
-  tab = button.dataset.tab; limit = 40;
-  document.querySelectorAll('[data-tab]').forEach(item => item.setAttribute('aria-pressed', String(item === button))); render();
+const tabButtons = document.querySelectorAll('[data-tab]');
+function updateTabs() { tabButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.tab === tab))); }
+updateTabs();
+tabButtons.forEach(button => button.onclick = () => {
+  tab = button.dataset.tab; limit = 40; titleToRestore = '';
+  PreviewLocation.write(tab);
+  updateTabs(); render();
 });
 async function load() {
   if (document.hidden) return;
@@ -174,6 +199,8 @@ async function load() {
       const watched = source && (stored('fmtv.watched.' + source) || (legacy?.source === source ? legacy : null));
       picks = data.snapshot.picks.map(pick => watched?.ids?.[pick.imdbId] ? {...pick, watched: true} : pick);
       render();
+      const restored = titleToRestore && picks.find(pick => pick.imdbId === titleToRestore);
+      if (restored) details(restored);
     }
     connectionStatus.textContent = data.refreshing ? 'Refreshing watchlist…' : picks.length + ' titles';
     if (!busy) {

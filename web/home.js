@@ -150,7 +150,12 @@
   // MARK: - Focus
 
   var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', DETAILS: 'details'};
-  var st = {zone: Z.SHELF, top: 0, tab: Prefs.tab(), card: 0, shelf: 0, drawer: 0, first: 0, browsing: false, grid: 0, row: 0, edit: 0};
+  var TAB_KIND = [null, 'movie', 'tv', 'unavailable', 'watched'];
+  var previewLocation = TV.isPreview ? PreviewLocation.read() : {};
+  var initialTab = TAB_KIND.indexOf(previewLocation.tab === 'all' ? null : previewLocation.tab);
+  var titleToRestore = previewLocation.title;
+  var st = {zone: Z.SHELF, top: 0, tab: initialTab >= 0 ? initialTab : Prefs.tab(),
+    card: 0, shelf: 0, drawer: 0, first: 0, browsing: false, grid: 0, row: 0, edit: 0};
   var cards = [];
 
   function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.DETAILS; }
@@ -212,7 +217,6 @@
 
   // MARK: - Top: title, tabs, buttons, quotes
 
-  var TAB_KIND = [null, 'movie', 'tv', 'unavailable', 'watched'];
 
   function renderTop() {
     $('title').textContent = 'TV';
@@ -481,6 +485,7 @@
   }
 
   function closeSheets() {
+    if (st.zone === Z.DETAILS) rememberPreviewTitle();
     torrentGeneration++; torrentView = false;
     detailRequest++;
     setClass($('details'), 'open', false);
@@ -698,6 +703,7 @@
     if (i === st.tab) return;
     browsePositions[st.tab] = {index: st.drawer, first: st.first};
     st.tab = i;
+    rememberPreviewTitle();
     Prefs.set('tab', i);
     st.drawer = browsePositions[i].index;
     st.first = browsePositions[i].first;
@@ -706,7 +712,7 @@
     renderDrawer();
   }
 
-  var detailReturn = Z.CARDS, detailRequest = 0, detailPick = null, detailActions = [], detailAction = 0;
+  var detailReturn = Z.CARDS, detailRequest = 0, detailPick = null, detailRatings = null, detailActions = [], detailAction = 0;
   function focusDetailActions() {
     var buttons = $('details').querySelectorAll('.detail-action');
     for (var index = 0; index < buttons.length; index++) setClass(buttons[index], 'focus', index === detailAction);
@@ -939,7 +945,9 @@
     el('div', 'detail-meta', content, metadata);
     var genres = el('div', 'detail-genres', content);
     (pick.genres || []).forEach(function (genre) { el('span', '', genres, genre); });
-    if (pick.rating > 0) el('div', 'detail-rating', content, '★ ' + pick.rating.toFixed(1) + ' / 10 · TMDB');
+    var ratings = el('div', 'detail-rating', content);
+    ratings.id = 'detail-ratings';
+    TitleRatings.render(ratings, pick, detailRatings, false);
     var people = pick.credits || {}, filmmakers = pick.kind === 'tv' ? people.creators : people.directors;
     if (filmmakers && filmmakers.length || people.cast && people.cast.length) {
       var credits = el('div', 'detail-credits', content);
@@ -958,10 +966,12 @@
   }
 
   function openDetails(pick) {
+    rememberPreviewTitle(pick.imdbId || pick.id);
     torrentView = false; torrentGeneration++; torrentSeason = 1; torrentMessage = ''; torrentSeasons = []; torrentSeasonMessage = '';
     detailReturn = st.zone;
     var request = ++detailRequest;
     detailAction = 0;
+    detailRatings = null;
     st.zone = Z.DETAILS;
     $('details').innerHTML = '';
     renderDetails(pick, !pick.detailsLoaded);
@@ -977,6 +987,12 @@
     pollTorrents();
     Data.details(pick, function (error, detail) {
       if (st.zone === Z.DETAILS && request === detailRequest) renderDetails(detail || pick, false);
+    });
+    Data.ratings(pick, function (result) {
+      if (st.zone !== Z.DETAILS || request !== detailRequest) return;
+      detailRatings = result;
+      var row = $('detail-ratings');
+      if (row) TitleRatings.render(row, detailPick, detailRatings, false);
     });
   }
 
@@ -994,11 +1010,24 @@
 
   function closeDetails() {
     if (torrentView) { cancelTorrentSearch(); torrentView = false; torrentGeneration++; renderDetails(detailPick, false); return; }
+    rememberPreviewTitle();
     torrentGeneration++; torrentView = false;
     detailRequest++;
     setClass($('details'), 'open', false);
     st.zone = detailReturn === Z.CARDS && !cards.length ? Z.SHELF : detailReturn;
     updateFocus();
+  }
+
+  function rememberPreviewTitle(id) {
+    if (!TV.isPreview) return;
+    titleToRestore = '';
+    PreviewLocation.write(TAB_KIND[st.tab] || 'all', id);
+  }
+
+  function restorePreviewTitle() {
+    if (!titleToRestore || sheetOpen()) return;
+    var pick = Data.currentPick(titleToRestore);
+    if (pick) openDetails(pick);
   }
 
   function move(dx, dy) {
@@ -1356,7 +1385,7 @@
   Data.onChange(function (kind) {
     if (document.hidden) return;
     if (kind !== 'weather') renderWatchlistStatus();
-    if (kind === 'account') renderTop();
+    if (kind === 'account') { rememberPreviewTitle(); renderTop(); }
     if (kind === 'account' || kind === 'watchlist' || kind === 'settings') {
       renderCards(kind === 'account');
       renderDrawer();
@@ -1368,6 +1397,7 @@
       }
     }
     if (st.zone === Z.SETTINGS) renderSettings();
+    if (kind === 'watchlist') restorePreviewTitle();
     var status = Data.watchlistStatus();
     if (manualRefresh && !status.refreshing) {
       manualRefresh = false;
@@ -1382,8 +1412,8 @@
       wasHidden = false;
       Data.startSession();
     }
-    reset();
-    loadApps(function () { renderAll(); Data.refresh(); });
+    if (!TV.isPreview || st.zone !== Z.DETAILS) reset();
+    loadApps(function () { renderAll(); restorePreviewTitle(); Data.refresh(); });
   }
 
   window.addEventListener('resize', fit);
@@ -1407,12 +1437,14 @@
     Data.setApps(apps);
     pickShelf();
     renderAll();
+    restorePreviewTitle();
     setTimeout(function () {
       loadApps(function (changed) { if (changed) renderAll(); });
       Data.refresh();
     }, 1500);
   } else loadApps(function () {
     renderAll();
+    restorePreviewTitle();
     setTimeout(function () { Data.refresh(); }, 1500);
   });
   setInterval(function () {

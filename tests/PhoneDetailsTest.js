@@ -4,10 +4,14 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const nodes = {};
 class Element {
-  constructor() { this.children = []; this.listeners = {}; this.value = ''; this.textContent = ''; this.classList = {add() {}, remove() {}}; }
+  constructor(tag) { this.tag = tag; this.children = []; this.listeners = {}; this.value = ''; this.textContent = ''; this.classList = {add() {}, remove() {}}; }
+  set textContent(value) { this.text = value; this.children = []; }
+  get textContent() { return this.text; }
   set id(value) { nodes[value] = this; }
   replaceChildren(...children) { this.children = children; }
   append(...children) { this.children.push(...children); }
+  appendChild(child) { this.append(child); }
+  contains(child) { return this.children.includes(child); }
   setAttribute() {}
   remove() {}
   addEventListener(type, callback) { this.listeners[type] = callback; }
@@ -15,12 +19,15 @@ class Element {
   close() { this.open = false; this.listeners.close?.(); }
 }
 const pick = {imdbId: 'tt123', title: 'Example', kind: 'tv', meta: '2024 · Drama', genres: ['Drama'],
-  rating: 8.1, seasons: 2, episodes: 12, overview: 'Synopsis', note: 'Personal note', backdrop: 'landscape.jpg',
+  rating: 8.1, tmdbId: 456, imdbRating: 8.4, seasons: 2, episodes: 12, overview: 'Synopsis',
+  note: 'Personal note', backdrop: 'landscape.jpg', poster: 'poster.jpg',
   credits: {creators: ['Creator'], cast: ['Actor']}, options: [{app: 'plex', service: 'Plex'}]};
 const requests = [];
 let resolveSlow, connected = true, seasonList = [1];
-const context = {URLSearchParams, location: {search: ''}, setInterval() {}, setTimeout() {}, clearTimeout() {}, document: {
-  hidden: false, body: new Element(), createElement() { return new Element(); },
+const location = {search: '', hash: '#tab=tv&title=tt123'};
+const context = {URLSearchParams, location, window: {location, history: {replaceState(state, title, hash) { location.hash = hash; }}},
+  setInterval() {}, setTimeout() {}, clearTimeout() {}, document: {
+  hidden: false, body: new Element(), createElement(tag) { return new Element(tag); },
   getElementById(id) { return nodes[id] ||= new Element(); }, querySelectorAll() { return []; }
 }, async fetch(url, options) {
   requests.push({url, options});
@@ -28,21 +35,38 @@ const context = {URLSearchParams, location: {search: ''}, setInterval() {}, setT
   if (url === '/api/watchlist') value = {snapshot: {picks: [pick]}};
   else if (url === '/api/details?id=ttSlow') return new Promise(resolve => { resolveSlow = () => resolve({ok: true, json: async () => ({pick: {...pick, title: 'Stale result'}})}); });
   else if (url.startsWith('/api/details')) value = {pick, downloadsEnabled: true};
+  else if (url.startsWith('/api/ratings')) value = {ratings: {
+    rottenTomatoes: {id: 'tv/example', score: 0}, metacritic: {id: 'tv/example', score: 74}
+  }};
   else if (url === '/api/torrents') value = JSON.parse(options.body).action === 'seasons' ? {seasons: seasonList} : {jobs: []};
   else value = {connected};
   return {ok: true, json: async () => value};
 }};
 vm.createContext(context);
+vm.runInContext(fs.readFileSync('web/ratings.js', 'utf8'), context);
+vm.runInContext(fs.readFileSync('web/preview-location.js', 'utf8'), context);
 vm.runInContext(fs.readFileSync('tools/phone/phone-torrents.js', 'utf8'), context);
 vm.runInContext(fs.readFileSync('tools/phone/phone.js', 'utf8'), context);
 const text = node => [node.textContent, ...node.children.map(text)].join(' ');
 async function run() {
   await new Promise(resolve => setImmediate(resolve));
+  assert.equal(nodes.details.open, true, 'The URL fragment restores title details after loading the watchlist');
+  nodes.details.close();
+  assert.equal(location.hash, '#tab=tv');
   await context.details(pick);
+  assert.equal(location.hash, '#tab=tv&title=tt123');
   const content = text(nodes['detail-content']);
-  for (const value of ['TV show', '2024', 'Drama', '★ 8.1 / 10 · TMDB', 'Created by:', 'Creator', 'Cast:', 'Actor',
+  for (const value of ['TV show', '2024', 'Drama', '★ 81% TMDB', '★ 8.4 IMDb', '★ 0% Rotten Tomatoes', '★ 74 Metacritic', 'Created by:', 'Creator', 'Cast:', 'Actor',
     '2 seasons', 'Synopsis', 'Your note', 'Personal note', 'Seasons in Plex: 1']) assert.ok(content.includes(value), value);
   assert.equal(nodes['detail-content'].children[0].src, 'landscape.jpg');
+  assert.equal(nodes['detail-content'].children[1].src, 'poster.jpg');
+  assert.deepEqual(nodes['detail-ratings'].children.map(node => node.href), [
+    'https://www.imdb.com/title/tt123/', 'https://www.themoviedb.org/tv/456',
+    'https://www.rottentomatoes.com/tv/example', 'https://www.metacritic.com/tv/example/'
+  ]);
+  const tvRatings = new Element();
+  context.TitleRatings.render(tvRatings, pick, {rottenTomatoes: {score: 0}, metacritic: {score: 74}}, false);
+  assert.deepEqual(tvRatings.children.map(node => node.tag), ['span', 'span', 'span', 'span']);
   assert.equal(requests.some(request => request.url === '/api/remote/command'), false, 'Details must not launch automatically');
   await context.command({action: 'launch', imdbId: pick.imdbId, app: 'plex'});
   assert.equal(nodes.status.textContent, '', 'Launch sending/success messages stay hidden');

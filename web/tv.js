@@ -519,6 +519,12 @@ var TV = (function () {
     isWebOS: webos,
     isPreview: !!window.FMTV_PREVIEW,
 
+    titleRatings: function (imdbId, done) {
+      luna('luna://io.freemytv.watchlist/ratings', {imdbId: imdbId}, function (result) {
+        if (result) done(result.ratings);
+      });
+    },
+
     torrents: function (payload, done) {
       if (webos) { luna('luna://io.freemytv.watchlist/torrents', payload, done); return; }
       if (!window.FMTV_PREVIEW) { done({error: 'Downloads require webOS or browser preview'}); return; }

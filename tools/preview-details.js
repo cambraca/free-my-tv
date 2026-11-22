@@ -35,7 +35,8 @@ module.exports = function (config, getSnapshot, request) {
         finish(null, {poster: detail.poster_path ? 'https://image.tmdb.org/t/p/w500' + detail.poster_path : pick.poster,
           backdrop: detail.backdrop_path ? 'https://image.tmdb.org/t/p/w1280' + detail.backdrop_path : pick.backdrop,
           overview: detail.overview || '', genres: (detail.genres || []).map(genre => genre.name),
-          rating: detail.vote_count > 0 ? Number(detail.vote_average) || 0 : 0,
+          rating: detail.vote_count > 0 ? Number(detail.vote_average) : null,
+          tmdbId: detail.id, tmdbRatingCheckedAt: Date.now(),
           trailer: Watchlist.trailer(detail.videos, language), credits: Watchlist.credits(detail, pick.kind),
           seasons: Number(detail.number_of_seasons) || pick.seasons, episodes: Number(detail.number_of_episodes) || pick.episodes,
           detailsLoaded: true});

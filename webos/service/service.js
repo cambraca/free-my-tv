@@ -13,6 +13,7 @@ try { legacy = JSON.parse(fs.readFileSync(target + '.json', 'utf8')); } catch (e
 var lists = require('./watchlists')(Watchlist, config, request, function (id) {
   return target + '-' + id + '.json';
 }, require('./watchlist-seed.json'), legacy);
+var titleRatings = require('./title-ratings')(request, target + '-ratings.json');
 
 function refreshActivity(start) {
   service.activityManager.create('watchlist-refresh', function (activity) {
@@ -26,6 +27,12 @@ service.register('get', function (message) {
   if (payload.refresh !== false) lists.refresh(state, payload.force === true, refreshActivity);
   var client = Watchlist.clientSnapshot(state.snapshot, payload.source, payload.updatedAt);
   message.respond({returnValue: true, snapshot: client, refreshing: state.running, error: state.error});
+});
+
+service.register('ratings', function (message) {
+  var id = message.payload.imdbId, state = lists.forTitle(id);
+  var pick = state && state.snapshot.picks.filter(function (item) { return item.imdbId === id; })[0];
+  titleRatings(pick, config, function (result) { message.respond({returnValue: true, ratings: result}); });
 });
 
 service.register('plexTarget', function (message) {

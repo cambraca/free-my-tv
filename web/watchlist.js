@@ -12,7 +12,7 @@
       + ' predefinedList(classType: WATCH_LIST, userId: $userId) {'
       + ' items(first: $first, after: $after, sort: {by: LIST_ORDER, order: DESC}) {'
       + ' pageInfo {hasNextPage endCursor} edges {node {createdDate description {originalText {plainText}} listItem {'
-      + ' ... on Title {id titleText {text} titleType {id} releaseYear {year} primaryImage {url}}}}} } } }';
+      + ' ... on Title {id titleText {text} titleType {id} releaseYear {year} primaryImage {url} ratingsSummary {aggregateRating}}}}} } } }';
 
   function fingerprint(value) {
     var hash = 2166136261;
@@ -135,6 +135,8 @@
               kind: /^(tvSeries|tvMiniSeries)$/.test(type) ? 'tv' : type === 'tvEpisode' ? 'episode' : 'movie',
               year: title.releaseYear && title.releaseYear.year, addedAt: node.createdDate || '',
               rank: entries.length, poster: title.primaryImage && title.primaryImage.url || '',
+              imdbRating: title.ratingsSummary && title.ratingsSummary.aggregateRating || null,
+              imdbRatingCheckedAt: Date.now(),
               note: (node.description && node.description.originalText && node.description.originalText.plainText || '').trim()});
           }
           var info = connection.pageInfo;
@@ -317,7 +319,7 @@
           backdrop: backdrop || detail.poster_path || '', services: services, links: {},
           poster: detail.poster_path || '', overview: detail.overview || '',
           genres: (detail.genres || []).map(function (genre) { return genre.name; }),
-          rating: detail.vote_count > 0 ? Number(detail.vote_average) || 0 : 0,
+          rating: detail.vote_count > 0 ? Number(detail.vote_average) : null, tmdbRatingCheckedAt: Date.now(),
           trailer: trailer(detail.videos, language),
           credits: credits(detail, kind),
           meta: [entry.year, detail.genres && detail.genres[0] && detail.genres[0].name,
@@ -372,7 +374,9 @@
         tmdbId: resolved && resolved.id,
         poster: resolved && resolved.poster ? 'https://image.tmdb.org/t/p/w500' + resolved.poster : entry.poster || '',
         overview: resolved && resolved.overview || '', genres: resolved && resolved.genres || [],
-        rating: resolved && resolved.rating || 0, detailsLoaded: !!(resolved && typeof resolved.overview === 'string'),
+        rating: resolved && resolved.rating, tmdbRatingCheckedAt: resolved && resolved.tmdbRatingCheckedAt,
+        imdbRating: entry.imdbRating, imdbRatingCheckedAt: entry.imdbRatingCheckedAt,
+        detailsLoaded: !!(resolved && typeof resolved.overview === 'string'),
         trailer: resolved && resolved.trailer,
         credits: resolved && resolved.credits,
         meta: formatMeta(resolved && resolved.meta || String(entry.year || '')), note: entry.note || '',
