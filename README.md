@@ -18,12 +18,12 @@ Open source. Built with Claude Code. One button to undo.
 ## What you get
 
 - **No ads.** No sponsored rows, banners or autoplaying promos. Not one.
-- **Your apps, front and center.** The streaming apps you actually use, on a glass shelf. Pick them and their order right on the TV.
+- **Your apps, front and center.** The streaming apps you actually use, on a glass shelf. Pick them and their order right on the TV, or (on Google TV and Android TV) let the one you opened last come first.
 - **Trending, not sponsored.** Three fresh picks every hour (up to six, in Home Settings) from what's trending this week and the latest releases, only from apps you already have, and from the services you choose. The focused one opens wide and the others show their posters. Movies and Shows get their own tabs, and on Google TV your own [Plex library](#your-plex-library-optional) can join in.
 - **Continue Watching** (Google TV and Android TV). *Home Settings* → *Top of the screen* puts what you left halfway in your apps on top, with its progress, and OK picks it up in its app. Or a big clock, or the picks.
-- **Your TMDB key from your phone.** *Home Settings* → *TMDB key* shows a QR code: scan it and paste the key. On LG and Samsung, type it with the remote.
-- **Weather at a glance.** A compact weather widget on the web launcher; Android retains its native forecast.
-- **Live TV or your box on HDMI, one press away** (LG and Samsung). *Home Settings* → *Live TV button* picks what the first top button opens: Live TV, as before, or one of the TV's HDMI inputs, shown under the name you gave the input on the TV when it has one.
+- **Your TMDB key from your phone** (Google TV and Android TV). Scan the QR code in *Home Settings* → *TMDB key*. For the web launcher, set the key in `config.properties`.
+- **Weather at a glance** (Google TV and Android TV). See the native forecast in Home Settings.
+- **Live TV or an HDMI input, one press away** (Google TV and Android TV). Choose what the button opens in *Home Settings* → *Live TV button*. Use *Settings* → *Inputs* to choose which inputs the drawer shows and in what order.
 - **What's playing.** Music, a podcast or the radio going on in the background shows on the home screen and the screensaver: the title, the artist and the app, from any app that tells Android what it plays (*Home Settings*, off until you turn it on).
 - **The status at a glance, and a mouse** (Google TV and Android TV). *Home Settings* → *Status icons* puts Wi-Fi or Ethernet, Bluetooth audio and a USB drive at the top of the home screen; off, nothing listens for them. A mouse or an air-mouse remote works too: hover moves the focus, the wheel scrolls, a click picks.
 - **Light by day, dark by night.** It follows your city's real sunset, the way your phone does.
@@ -156,7 +156,7 @@ To remove it for good, switch to *Original* first, then uninstall *Free My TV* (
 ## What it changes
 
 - It becomes the home screen and, unless `screensaver=false`, the screensaver.
-- Picking Continue Watching in Home Settings grants `READ_TV_LISTINGS` with `pm grant` through the TV's own ADB; *Original* takes it back with `pm revoke`. Pictures come only from the TV (`content://`, `android.resource://`), never from the network.
+- Picking Continue Watching in Home Settings grants `READ_TV_LISTINGS` with `pm grant` through the TV's own ADB; *Original* takes it back with `pm revoke`. Pictures come from the TV (`content://`, `android.resource://`) and from the picture addresses the apps themselves left there (Netflix, for one): `https` only, never an address on your home network, pictures only, with a size and a time limit.
 - It turns off, without uninstalling:
   - the stock home screen and screensaver (the screensaver stays with `screensaver=false`);
   - Google TV's recovery home, Play Games and YouTube Music;
@@ -197,8 +197,8 @@ It's your code, and Claude Code finds its way around it. Try:
 - **It uses the TV's own ADB, from inside the TV.** The app connects to `127.0.0.1:5555` with its own key (that's the *Allow USB debugging?* prompt) and runs the same commands you would: `cmd package set-home-activity`, `settings put secure screensaver_components`, `pm disable-user`. Nothing listens to the network.
 - **Drawn by hand on one Canvas**, with Android 13 shaders for the frosted glass and the sky (plain fills on Android 9 to 12, with lighter shadows and no GPU layers on 9 to 11 for their older GPUs).
 - **A safety net.** A watchdog in a separate process brings back the stock home screen after three crashes in five minutes, and a boot check keeps your choice after TV updates.
-- **On LG and Samsung, the same design in plain HTML, CSS and JavaScript** ([`web/`](web)), written for the Chromium of older TVs, with no frameworks. [`webos/build.py`](webos/build.py) packs it with `config.properties` into an `.ipk` without LG's tools, and [`webos/install.py`](webos/install.py) installs it through Developer Mode; on LG it lists and opens apps through the TV's own service bus (Luna), as LG's launcher does. [`tizen/build.py`](tizen/build.py) packs the same app into a Samsung `.wgt`, which uses Tizen's web APIs for the apps and the inputs. To preview it on a computer: `python3 webos/build.py --preview`, then open `out/webos/index.html` (a stand-in lists sample apps).
-- **Continue Watching** reads Android TV's Watch Next list (what apps share about what you're watching). Only picking it grants `READ_TV_LISTINGS` through the TV's ADB; *Original* revokes it. Pictures load only from the TV (`content://`, `android.resource://`), never from the network.
+- **On LG and Samsung, the launcher uses plain HTML, CSS and JavaScript** ([`web/`](web)) written for older TVs. [`webos/build.py`](webos/build.py) packs an `.ipk` with `config.properties`, and [`tizen/build.py`](tizen/build.py) packs a Samsung `.wgt`. Run `node tools/preview.js` and open `http://127.0.0.1:43333` to preview it. See the [fork guide](FORK_CUSTOMIZATIONS.md) for watchlist configuration and web Settings.
+- **Continue Watching** reads Android TV's Watch Next list after you select it. Selecting it grants `READ_TV_LISTINGS` through the TV's ADB, and *Original* revokes the permission. Artwork comes from the TV or from HTTPS picture addresses supplied by apps. Network pictures have size and time limits and exclude local network addresses.
 - **Data** comes only from TMDB (trending titles, new releases, the most popular titles when those are few, and which app streams what in your country), Open-Meteo (forecast, sunrise and sunset), optionally Watchmode (the picks' own pages in their apps, with a `watchmode_key`), optionally your Plex server (with a `plex_url`), optionally your Immich server (your photos, with an `immich_server` and its key) and optionally Trakt (what you're watching and your watchlist, with a `trakt_client_id`, once you sign in on the TV).
 
 | File | What it is |
@@ -209,7 +209,7 @@ It's your code, and Claude Code finds its way around it. Try:
 | [`Recs.java`](app/src/io/freemytv/Recs.java) | The picks (TMDB) |
 | [`KeyPage.java`](app/src/io/freemytv/KeyPage.java), [`Qr.java`](app/src/io/freemytv/Qr.java) | The TMDB and Watchmode keys sent from a phone, and the QR code |
 | [`WatchNext.java`](app/src/io/freemytv/WatchNext.java) | Continue Watching from the TV's lists |
-| [`WatchArt.java`](app/src/io/freemytv/WatchArt.java) | Continue Watching pictures, only from the TV |
+| [`WatchArt.java`](app/src/io/freemytv/WatchArt.java) | Continue Watching pictures, including HTTPS artwork fetched by [`NetPicture.java`](app/src/io/freemytv/NetPicture.java) |
 | [`HomeData.java`](app/src/io/freemytv/HomeData.java) | Weather |
 | [`HomeApps.java`](app/src/io/freemytv/HomeApps.java) | The shelf, inputs and All Apps |
 | [`DreamView.java`](app/src/io/freemytv/DreamView.java) | The screensaver |
@@ -219,7 +219,7 @@ It's your code, and Claude Code finds its way around it. Try:
 | [`RecentApps.java`](app/src/io/freemytv/RecentApps.java), [`ScreenBlur.java`](app/src/io/freemytv/ScreenBlur.java) | Recent Apps, over a blurred copy of the screen |
 | [`Watchdog.java`](app/src/io/freemytv/Watchdog.java) | The safety net |
 | [`web/home.js`](web/home.js) | The home screen on LG TVs |
-| [`web/tv.js`](web/tv.js) | The TV's apps and inputs, on LG and Samsung |
+| [`web/tv.js`](web/tv.js) | App discovery and launching on LG and Samsung |
 | [`webos/build.py`](webos/build.py), [`webos/install.py`](webos/install.py), [`webos/renew.py`](webos/renew.py) | The LG app package, its install, and renewing Developer Mode |
 | [`tizen/build.py`](tizen/build.py) | The Samsung app package |
 

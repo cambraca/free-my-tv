@@ -23,8 +23,12 @@ var TV = (function () {
   // 1) still stutters at each move with flat alone (#461). deviceMemory (webOS 5+, Tizen 5+) is the nearest power of two,
   // so it reads 1 up to about 1.5 GB.
   var lowMemory = navigator.deviceMemory && navigator.deviceMemory <= 1;
-  if (tizen2 || ((webos || samsung) && lowMemory)) {
-    document.documentElement.className += ' lite';
+  // webOS 1 to 3 (2014-2017, Chromium 38) have no deviceMemory, and their sets have 1 to 1.5 GB: lite too.
+  var chrome = /Chrome\/(\d+)/.exec(navigator.userAgent);
+  var oldWebos = webos && !navigator.deviceMemory && chrome && parseInt(chrome[1], 10) < 53;
+  if (tizen2 || oldWebos || ((webos || samsung) && lowMemory)) {
+    // On webOS 3 a separate compositor layer per shelf tile reduces repaints during focus moves.
+    document.documentElement.className += oldWebos ? ' lite layered' : ' lite';
   } else if (samsung && navigator.deviceMemory && navigator.deviceMemory <= 2) {
     // Samsungs up to 2 GB keep the animations but not the soft shadows of the parts that move (home.css): a 2021 Frame
     // (QE55LS03A, Tizen 6, 2 GB, ratio 1) froze for up to 360 ms on each move along the picks and dropped 78 frames in
@@ -65,6 +69,9 @@ var TV = (function () {
 
   // LG's own screensaver asks every subscribed app first. While Free My TV is on screen and its own screensaver will
   // take over (`hold`, from home.js), it says no; otherwise, and in the background, the TV's runs as before.
+  // Only where the TV lets the app subscribe: webOS 3.4 denies the call to Developer Mode apps (getPowerState too), so
+  // there the one reply is that refusal, with no timestamp: nothing is held, and saverBridge stays set, so it isn't
+  // tried again. A 60UH6150 didn't start its own screensaver over Free My TV anyway (#478).
   var saverBridge = null;
 
   function holdScreenSaver(hold) {
@@ -189,18 +196,23 @@ var TV = (function () {
     'QizQxC7CUf.PlayMovies': 'icons/googleplay.svg',
     'vIutycUzou.SteamLink': 'icons/steam.svg',
     'geUOM7qimf.FOXPlay': 'icons/fox.svg',
-    'AprZAARz4r.Jellyfin': 'icons/jellyfin.svg'
+    'AprZAARz4r.Jellyfin': 'icons/jellyfin.svg',
+    // ITVX's own background is in the SVG, so the tile takes ITVX's yellow-green (lift() and showLogo() in home.js).
+    'OEvCiupaFR.ITVHub': 'icons/itvx.svg'
   };
 
   // The same logos by name (lowercase letters and digits only), for app ids the list above doesn't know: older TVs
   // (a 2016 KU6300, Tizen 2.4) can carry other ids for the same apps.
+  // On a 2025 LS03F (Tizen 9), BBC iPlayer's iconPath is Tizen's pinwheel and Channel 4's a build-stamped
+  // placeholder: both logos from Wikipedia, public domain in the US as text and simple shapes (PD-textlogo).
   var SAMSUNG_ICON_NAMES = {
     youtube: 'icons/youtube.png', primevideo: 'icons/prime.png', amazonprimevideo: 'icons/prime.png',
     netflix: 'icons/netflix.svg', max: 'icons/max.svg', spotify: 'icons/spotify.svg',
     deezer: 'icons/deezer.svg', youtubekids: 'icons/youtubekids.svg', redbulltv: 'icons/redbull.svg', ted: 'icons/ted.svg',
     steamlink: 'icons/steam.svg', jellyfin: 'icons/jellyfin.svg', paramount: 'icons/paramountplus.svg',
     paramountplus: 'icons/paramountplus.svg', crunchyroll: 'icons/crunchyroll.svg', twitch: 'icons/twitch.svg',
-    plex: 'icons/plex.svg', appletv: 'icons/appletv.svg'
+    plex: 'icons/plex.svg', appletv: 'icons/appletv.svg',
+    bbciplayer: 'icons/bbciplayer.svg', channel4: 'icons/channel4.svg'
   };
 
   // Names Smart Hub gets wrong: HBO's app has none (so it never reached the shelf), others are long or old.
@@ -208,7 +220,8 @@ var TV = (function () {
     'NvZ26VG9Yw.HBOGOLAG': 'Max',
     'rJeHak5zRg.Spotify': 'Spotify',
     'evKhCgZelL.AmazonIgnitionLauncher2': 'Prime Video',
-    'org.tizen.globoplayapp': 'Globoplay'
+    'org.tizen.globoplayapp': 'Globoplay',
+    'OEvCiupaFR.ITVHub': 'ITVX'   // "ITVX - fresh, free streaming." on a 2025 LS03F (Tizen 9)
   };
 
   // Samsung's settings menu on Tizen 3, which answers no "settings" app control.

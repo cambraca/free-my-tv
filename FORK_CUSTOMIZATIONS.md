@@ -507,6 +507,15 @@ The first upstream merge needed these specific combinations; future merges must 
 - Retain the existing web configuration shape/cache identity; upstream's Android Plex URL, Trakt, Immich, and Home
   Assistant configuration does not replace this fork's web Plex host/port or watchlist pipeline.
 
+### Upstream merge of 2026-11-22 (fork 1.5.1)
+
+- Keep the new Android remote support, Recent shelf ordering, input settings, and Continue Watching artwork
+  fixes. Include the native Live TV button row and adjust the rows below it. Crypto controls stay disabled.
+- Keep upstream fixed-weight Inter fonts for older web engines, the webOS 3 shelf compositing changes, and
+  the Samsung app icon and name fixes. Preserve the fork's card layout, watchlist, ratings, URL restoration,
+  and six-row Settings menu. The upstream web input editor, Samsung Home takeover, Watchmode picks, and RTL
+  layout depend on the upstream web UI and are excluded from this merge.
+
 ### Validation checklist
 
 1. Inspect the complete resolved diff, including automatically merged lines adjacent to conflicts. Check for
