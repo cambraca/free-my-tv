@@ -24,19 +24,22 @@ const pick = {imdbId: 'tt123', title: 'Example', kind: 'tv', meta: '2024 · Dram
   credits: {creators: ['Creator'], cast: ['Actor']}, options: [{app: 'plex', service: 'Plex'}]};
 const requests = [];
 let resolveSlow, connected = true, seasonList = [1];
-const location = {search: '', hash: '#tab=tv&title=tt123'};
+const location = {search: '', hash: '#tab=tv&title=tt123&account=p.Example2'};
 const context = {URLSearchParams, location, window: {location, history: {replaceState(state, title, hash) { location.hash = hash; }}},
+  IMDB_ACCOUNTS: [{id: 'ur123', name: 'First'}, {id: 'p.Example2', name: 'Second'}],
+  localStorage: {getItem: () => JSON.stringify('ur123'), setItem() {}},
   setInterval() {}, setTimeout() {}, clearTimeout() {}, document: {
   hidden: false, body: new Element(), createElement(tag) { return new Element(tag); },
   getElementById(id) { return nodes[id] ||= new Element(); }, querySelectorAll() { return []; }
 }, async fetch(url, options) {
   requests.push({url, options});
   let value;
-  if (url === '/api/watchlist') value = {snapshot: {picks: [pick]}};
-  else if (url === '/api/details?id=ttSlow') return new Promise(resolve => { resolveSlow = () => resolve({ok: true, json: async () => ({pick: {...pick, title: 'Stale result'}})}); });
+  if (url.startsWith('/api/watchlist')) value = {snapshot: {picks: [pick]}};
+  else if (url.startsWith('/api/details?id=ttSlow&')) return new Promise(resolve => { resolveSlow = () => resolve({ok: true, json: async () => ({pick: {...pick, title: 'Stale result'}})}); });
   else if (url.startsWith('/api/details')) value = {pick, downloadsEnabled: true};
   else if (url.startsWith('/api/ratings')) value = {ratings: {
-    rottenTomatoes: {id: 'tv/example', score: 0}, metacritic: {id: 'tv/example', score: 74}
+    rottenTomatoes: {id: 'tv/example', score: 0}, metacritic: {id: 'tv/example', score: 74},
+    letterboxd: {id: 'example', score: 4.24}
   }};
   else if (url === '/api/torrents') value = JSON.parse(options.body).action === 'seasons' ? {seasons: seasonList} : {jobs: []};
   else value = {connected};
@@ -51,22 +54,32 @@ const text = node => [node.textContent, ...node.children.map(text)].join(' ');
 async function run() {
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(nodes.details.open, true, 'The URL fragment restores title details after loading the watchlist');
+  assert.equal(requests[0].url, '/api/watchlist?account=p.Example2', 'The shared profile wins over the saved profile');
   nodes.details.close();
-  assert.equal(location.hash, '#tab=tv');
+  assert.equal(location.hash, '#tab=tv&account=p.Example2');
+  assert.equal(nodes['tv-layout'].href, '/?mode=tv#tab=tv&account=p.Example2');
   await context.details(pick);
-  assert.equal(location.hash, '#tab=tv&title=tt123');
+  assert.equal(location.hash, '#tab=tv&title=tt123&account=p.Example2');
   const content = text(nodes['detail-content']);
-  for (const value of ['TV show', '2024', 'Drama', '★ 81% TMDB', '★ 8.4 IMDb', '★ 0% Rotten Tomatoes', '★ 74 Metacritic', 'Created by:', 'Creator', 'Cast:', 'Actor',
+  for (const value of ['TV show', '2024', 'Drama', '★ 81%', '★ 8.4', '★ 0%', '★ 74', 'Created by:', 'Creator', 'Cast:', 'Actor',
     '2 seasons', 'Synopsis', 'Your note', 'Personal note', 'Seasons in Plex: 1']) assert.ok(content.includes(value), value);
   assert.equal(nodes['detail-content'].children[0].src, 'landscape.jpg');
   assert.equal(nodes['detail-content'].children[1].src, 'poster.jpg');
   assert.deepEqual(nodes['detail-ratings'].children.map(node => node.href), [
     'https://www.imdb.com/title/tt123/', 'https://www.themoviedb.org/tv/456',
-    'https://www.rottentomatoes.com/tv/example', 'https://www.metacritic.com/tv/example/'
+    'https://www.rottentomatoes.com/tv/example', 'https://www.metacritic.com/tv/example/',
+    'https://letterboxd.com/film/example/'
   ]);
+  assert.deepEqual(nodes['detail-ratings'].children.map(node => node.children[0].alt),
+    ['IMDb', 'TMDB', 'Rotten Tomatoes', 'Metacritic', 'Letterboxd']);
+  assert.equal(nodes['detail-ratings'].children[4].textContent.trim(), '★ 4.2');
   const tvRatings = new Element();
-  context.TitleRatings.render(tvRatings, pick, {rottenTomatoes: {score: 0}, metacritic: {score: 74}}, false);
-  assert.deepEqual(tvRatings.children.map(node => node.tag), ['span', 'span', 'span', 'span']);
+  context.TitleRatings.render(tvRatings, pick, {
+    rottenTomatoes: {score: 0}, metacritic: {score: 74}, letterboxd: {id: 'example', score: 4.24}
+  }, 'tv');
+  assert.deepEqual(tvRatings.children.map(node => node.tag), ['span', 'span', 'span', 'span', 'span']);
+  assert.ok(tvRatings.children.every(node => node.children[0].height === 26));
+  assert.ok(nodes['detail-ratings'].children.every(node => node.children[0].height === undefined));
   assert.equal(requests.some(request => request.url === '/api/remote/command'), false, 'Details must not launch automatically');
   await context.command({action: 'launch', imdbId: pick.imdbId, app: 'plex'});
   assert.equal(nodes.status.textContent, '', 'Launch sending/success messages stay hidden');
@@ -82,6 +95,10 @@ async function run() {
   resolveSlow(); await slow;
   assert.equal(text(nodes['detail-content']).includes('Stale result'), false);
   assert.equal(text(nodes['detail-content']).includes('Example'), true);
+  nodes.details.close();
+  nodes.profiles.children[0].onclick();
+  assert.equal(location.hash, '#tab=tv&account=ur123');
+  assert.ok(requests.some(request => request.url === '/api/watchlist?account=ur123'));
   console.log('PhoneDetailsTest: full detail information, artwork, downloads, details-first behavior and stale responses passed.');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

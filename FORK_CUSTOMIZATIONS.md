@@ -293,15 +293,25 @@ These two selection policies are deliberately different. Do not share one orderi
 - Retain poster/synopsis/genres/rating/TMDB ID in cached picks. An older cache can fetch just the selected title's
   details on demand (exact IMDb lookup if its TMDB ID is missing), with coalesced requests and a session cache;
   do not recrawl the watchlist or block opening the detail page. Missing artwork/synopses have graceful fallbacks.
-- Show ratings in one compact row, for example **★ 7.6 IMDb**, **★ 78% TMDB**, **★ 92% Rotten Tomatoes**,
-  and **★ 74 Metacritic**.
+- Show stars and scores in a compact row, ordered IMDb, TMDB, Rotten Tomatoes, Metacritic, and Letterboxd. Use local
+  wordmarks and small brand icons instead of visible service labels, with the full names in image alt text
+  and as a text fallback if a logo fails to load. Assets come from the [IMDb site badge](https://commons.wikimedia.org/wiki/File:IMDB_Logo_2016.svg),
+  [TMDB's approved logos](https://www.themoviedb.org/about/logos-attribution), and the site icons published by
+  [Rotten Tomatoes](https://www.rottentomatoes.com/) and [Metacritic](https://www.metacritic.com/).
+  Set preview logo sizes and padding in the image files. TV mode uses the same files at a uniform 26px height
+  for readability. Center the score and logo within each rating group, without individual logo CSS.
+  Keep the TMDB badge background inside its SVG and leave transparent padding above and below it.
+  Show the three Letterboxd dots on a transparent background with a little vertical padding. [Letterboxd brand assets](https://letterboxd.com/about/brand/)
   In the responsive preview the scores are non-underlined links that open the exact title pages in a new tab.
-  TV mode renders plain text in the browser and on the installed TV app. Keep a last-checked timestamp per
+  TV mode shows scores and logos without links in the browser and on the installed TV app. Keep a last-checked timestamp per
   title and source. IMDb and TMDB scores travel with the
   watchlist snapshot. Opening details also checks scores that are at least a week old or have no timestamp.
-  The preview and webOS backends resolve Rotten Tomatoes and Metacritic via Wikidata's exact title IDs, then
-  read the Tomatometer and the whole-title Metascore from the matched pages. Omit missing scores and ambiguous matches. Persist detail lookups,
-  keep the last score after a failed refresh, and load scores independently of title details and provider refresh.
+  The preview and webOS backends resolve Rotten Tomatoes, Metacritic, and Letterboxd via exact Wikidata title
+  IDs. Read the Tomatometer, whole-title Metascore, and Letterboxd's [weighted score out of five](https://support.letterboxd.com/hc/en-us/articles/17815623056911-Can-I-display-or-embed-Letterboxd-ratings-on-my-site-or-app)
+  from the matched pages. Display Letterboxd scores to one decimal place. Letterboxd covers films and some
+  limited series, so omit titles without a score or an
+  unambiguous match. Persist detail lookups, keep the last score after a failed refresh, and load scores
+  independently of title details and provider refresh.
 - Detail popups include compact text credits above the synopsis: up to two directors for movies or two creators
   for shows, plus the first four billed cast members. Deduplicate names and omit missing rows; keep each row to
   at most two lines, with no portraits or character biographies. Credits inherit the theme and scroll with the
@@ -451,9 +461,10 @@ builds the webOS preview, watches source/configuration changes, and rebuilds/rel
   preview, use `node tools/preview.js --no-build`; this also watches for changes. `--port` and `--config` are supported.
 - Preview rebuilds use `--no-watchlist-sync` so editing CSS/JS does not synchronously recrawl the whole watchlist.
   The backend refreshes stale data separately, avoiding browser cross-origin restrictions for IMDb and Plex.
-- Both browser preview layouts keep the selected tab and open IMDb title ID in the URL fragment, for example
-  `#tab=movie&title=tt1375666`. Reloads restore the title once it is available in the active watchlist. Closing
-  details clears the title from the fragment and keeps the tab.
+- Both browser preview layouts keep the selected IMDb account, tab, and open title in the URL fragment, for
+  example `#tab=movie&title=tt1375666&account=ur123`. A configured URL account takes priority over the saved
+  account. An unconfigured ID falls back to the usual account selection. Reloads restore the title from that
+  watchlist. Closing details clears the title and keeps the account and tab.
 - Default to localhost. Explicit `preview_host=0.0.0.0` enables LAN access without a browser login. The installed TV bridge still uses a `preview_token` of at least 24 characters. Generated config and caches can contain credentials and personal data.
   Restart the server after changing `tools/preview.js` or the title-ratings backend. A browser reload only
   reloads the page.

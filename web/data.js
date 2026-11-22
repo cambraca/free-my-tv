@@ -178,9 +178,8 @@ var Data = (function () {
     if (!localWatched || !localWatched.ids) localWatched = {source: watchSource, ids: {}};
   }
 
-  var initialAccount = stored('imdbAccount');
-  loadAccount(accounts.some(function (account) { return account.id === initialAccount; })
-    ? initialAccount : accounts.length ? accounts[0].id : '');
+  var requestedAccount = TV.isPreview ? PreviewLocation.read().account : '';
+  loadAccount(PreviewLocation.selectAccount(accounts, requestedAccount, stored('imdbAccount')));
 
   function isWatched(pick) {
     if (localWatched.ids[pick.imdbId || pick.id]) return true;

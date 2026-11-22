@@ -7,6 +7,7 @@ var WIKIDATA = 'https://www.wikidata.org/';
 var WEEK = 7 * 24 * 3600000;
 var RT_SITE = {property: 'P1258', moviePrefix: 'm', base: RT, suffix: '', readScore: tomatometer};
 var METACRITIC_SITE = {property: 'P1712', moviePrefix: 'movie', base: METACRITIC, suffix: '/', readScore: metascore};
+var LETTERBOXD_SITE = {property: 'P6127', base: 'https://letterboxd.com/film/', suffix: '/', readScore: letterboxdScore};
 
 function get(request, url, accept, done) {
   request('GET', url, {Accept: accept}, null, done, 0, 3000);
@@ -24,20 +25,35 @@ function tomatometer(html, url) {
   } catch (error) { return undefined; }
 }
 
-function metascore(html, url) {
+function structuredScore(html, url, readScore) {
   if (typeof html !== 'string') return undefined;
   var scripts = /<script\b[^>]*\btype="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi, match;
   while ((match = scripts.exec(html))) {
     var title;
-    try { title = JSON.parse(match[1]); } catch (error) { continue; }
+    var json = match[1].replace(/^\s*\/\*\s*<!\[CDATA\[\s*\*\/|\/\*\s*\]\]>\s*\*\/\s*$/g, '');
+    try { title = JSON.parse(json); } catch (error) { continue; }
     if (!title || title.url !== url || !/^(Movie|TVSeries)$/.test(title['@type'])) continue;
     var rating = title.aggregateRating;
     if (!rating) return null;
+    var score = readScore(rating);
+    if (score !== undefined) return score;
+  }
+  return undefined;
+}
+
+function metascore(html, url) {
+  return structuredScore(html, url, function (rating) {
     var score = rating.ratingValue;
     if (rating.name === 'Metascore' && typeof score === 'number' && Math.floor(score) === score
         && score >= 0 && score <= 100) return score;
-  }
-  return undefined;
+  });
+}
+
+function letterboxdScore(html, url) {
+  return structuredScore(html, url, function (rating) {
+    var score = rating.ratingValue;
+    if (rating.bestRating === 5 && typeof score === 'number' && score >= 0.5 && score <= 5) return score;
+  });
 }
 
 function wikidata(imdbId, request) {
@@ -66,7 +82,8 @@ function reviewSite(pick, request, item, site, done) {
       'application/json', function (error, statements) {
         if (error) { done(error); return; }
         var paths = [];
-        var pattern = new RegExp('^' + (pick.kind === 'tv' ? 'tv' : site.moviePrefix) + '/[a-z0-9_-]+$');
+        var prefix = site.moviePrefix ? (pick.kind === 'tv' ? 'tv' : site.moviePrefix) + '/' : '';
+        var pattern = new RegExp('^' + prefix + '[a-z0-9_-]+$');
         var claims = statements && statements[site.property];
         (Array.isArray(claims) ? claims : []).forEach(function (statement) {
           var path = statement && statement.value && statement.value.content;
@@ -77,7 +94,7 @@ function reviewSite(pick, request, item, site, done) {
         get(request, url, 'text/html', function (error, html) {
           if (error) { done(error); return; }
           var score = site.readScore(html, url);
-          if (score === undefined) { done(new Error('Invalid critic scorecard')); return; }
+          if (score === undefined) { done(new Error('Invalid rating data')); return; }
           done(null, {id: paths[0], score: score});
         });
       });
@@ -149,6 +166,9 @@ module.exports = function (request, file) {
       }},
       {name: 'metacritic', load: function (finish) {
         reviewSite(pick, request, item, METACRITIC_SITE, finish);
+      }},
+      {name: 'letterboxd', load: function (finish) {
+        reviewSite(pick, request, item, LETTERBOXD_SITE, finish);
       }}
     ];
     var remaining = sources.length;

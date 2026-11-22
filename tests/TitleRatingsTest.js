@@ -22,6 +22,7 @@ function request(method, url, headers, body, done) {
   if (url.includes('srsearch=')) response = {query: {search: [{title: 'Q123'}]}};
   else if (url.includes('property=P1258')) response = {P1258: [{value: {content: 'm/example'}}]};
   else if (url.includes('property=P1712')) response = {P1712: [{value: {content: 'movie/example'}}]};
+  else if (url.includes('property=P6127')) response = {P6127: [{value: {content: 'example'}}]};
   else if (url === 'https://www.rottentomatoes.com/m/example') {
     response = '<link rel="canonical" href="' + url + '"><script id="media-scorecard-json">'
       + '{"criticsScore":{"scorePercent":"0%"},"audienceScore":{"scorePercent":"99%"}}</script>';
@@ -29,6 +30,10 @@ function request(method, url, headers, body, done) {
     response = '<script type="application/ld+json">' + JSON.stringify({
       '@type': 'Movie', url, aggregateRating: {name: 'Metascore', ratingValue: 74}
     }) + '</script>';
+  } else if (url === 'https://letterboxd.com/film/example/') {
+    response = '<script type="application/ld+json">/* <![CDATA[ */\n' + JSON.stringify({
+      '@type': 'Movie', url, aggregateRating: {bestRating: 5, ratingValue: 4.24}
+    }) + '\n/* ]]> */</script>';
   } else if (url.startsWith('https://api.graphql.imdb.com/')) {
     response = {data: {title: {id: pick.imdbId, ratingsSummary: {aggregateRating: 8.4}}}};
   } else {
@@ -45,22 +50,24 @@ async function run() {
   assert.deepEqual(first, simultaneous);
   assert.deepEqual(first, {
     rottenTomatoes: {id: 'm/example', score: 0, checkedAt: now},
-    metacritic: {id: 'movie/example', score: 74, checkedAt: now}
+    metacritic: {id: 'movie/example', score: 74, checkedAt: now},
+    letterboxd: {id: 'example', score: 4.24, checkedAt: now}
   });
-  assert.equal(requests.length, 5);
+  assert.equal(requests.length, 7);
 
   lookup = titleRatings(request, filename);
   now += week - 1;
   assert.deepEqual(await open(pick), first);
-  assert.equal(requests.length, 5, 'Fresh scores survive a restart without requests');
+  assert.equal(requests.length, 7, 'Fresh scores survive a restart without requests');
 
   now++;
   const refreshed = await open({...pick, imdbRatingCheckedAt: now - 100});
   assert.deepEqual(refreshed.tmdb, {id: 42, score: 7.8, checkedAt: now});
   assert.equal(refreshed.rottenTomatoes.checkedAt, now);
   assert.equal(refreshed.metacritic.checkedAt, now);
+  assert.equal(refreshed.letterboxd.checkedAt, now);
   assert.equal(refreshed.imdb, undefined, 'A recent IMDb snapshot avoids its independent lookup');
-  assert.equal(requests.length, 11);
+  assert.equal(requests.length, 15);
 
   now += week;
   offline = true;

@@ -947,7 +947,7 @@
     (pick.genres || []).forEach(function (genre) { el('span', '', genres, genre); });
     var ratings = el('div', 'detail-rating', content);
     ratings.id = 'detail-ratings';
-    TitleRatings.render(ratings, pick, detailRatings, false);
+    TitleRatings.render(ratings, pick, detailRatings, 'tv');
     var people = pick.credits || {}, filmmakers = pick.kind === 'tv' ? people.creators : people.directors;
     if (filmmakers && filmmakers.length || people.cast && people.cast.length) {
       var credits = el('div', 'detail-credits', content);
@@ -992,7 +992,7 @@
       if (st.zone !== Z.DETAILS || request !== detailRequest) return;
       detailRatings = result;
       var row = $('detail-ratings');
-      if (row) TitleRatings.render(row, detailPick, detailRatings, false);
+      if (row) TitleRatings.render(row, detailPick, detailRatings, 'tv');
     });
   }
 
@@ -1021,7 +1021,7 @@
   function rememberPreviewTitle(id) {
     if (!TV.isPreview) return;
     titleToRestore = '';
-    PreviewLocation.write(TAB_KIND[st.tab] || 'all', id);
+    PreviewLocation.write(TAB_KIND[st.tab] || 'all', id, Data.activeAccount());
   }
 
   function restorePreviewTitle() {
@@ -1430,6 +1430,7 @@
   });
 
   I18N.set(Prefs.language());
+  if (TV.isPreview) PreviewLocation.write(TAB_KIND[st.tab] || 'all', titleToRestore, Data.activeAccount());
   fit();
   renderTop();
   apps = TV.cachedApps();

@@ -79,7 +79,8 @@ main { padding-top: 0; }
 .detail-genres span { padding: 6px 10px; border-radius: 20px; background: #8882; font-size: 14px; }
 .detail-rating { font-weight: 600; }
 .detail-rating:empty { display: none; }
-.detail-rating > * { display: inline-block; margin-right: 14px; }
+.detail-rating > * { display: inline-flex; align-items: center; vertical-align: middle; white-space: nowrap; }
+.detail-rating > :not(:last-child) { margin-right: 16px; }
 .detail-rating a { font-size: inherit; text-decoration: none; }
 .detail-credits { font-size: 15px; }
 .detail-credits p { margin: 8px 0; }

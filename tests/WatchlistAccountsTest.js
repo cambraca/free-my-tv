@@ -32,12 +32,13 @@ const storage = {
 };
 const pending = [];
 const sandbox = {
-  window: {CONFIG: config, WATCHLIST_SEEDS: {ur456: second}},
+  window: {CONFIG: config, WATCHLIST_SEEDS: {ur456: second}, location: {hash: ''}},
   navigator: {}, document: {}, Watchlist,
   localStorage: {getItem: key => storage[key], setItem: (key, value) => { storage[key] = value; }},
   TV: {isPreview: true, zone: () => '', watchlist: (done, force, known, id) => pending.push({done, id})}
 };
-const dataScript = fs.readFileSync(require.resolve('../web/data.js'), 'utf8');
+const dataScript = fs.readFileSync(require.resolve('../web/preview-location.js'), 'utf8') + '\n'
+  + fs.readFileSync(require.resolve('../web/data.js'), 'utf8');
 vm.runInNewContext(dataScript, sandbox);
 const {Data} = sandbox;
 assert.equal(Data.activeAccount(), 'ur123');
@@ -68,6 +69,13 @@ vm.runInNewContext(dataScript, reopened);
 assert.equal(reopened.Data.activeAccount(), 'ur456');
 assert.equal(reopened.Data.currentPick('tt22').id, 'tt22');
 assert.equal(reopened.Data.isWatched(second.picks[0]), true);
+reopened.window.location = {hash: '#tab=movie&title=tt11&account=ur123'};
+vm.runInNewContext(dataScript, reopened);
+assert.equal(reopened.Data.activeAccount(), 'ur123');
+assert.equal(reopened.Data.currentPick('tt11').id, 'tt11');
+reopened.window.location = {hash: '#account=ur999'};
+vm.runInNewContext(dataScript, reopened);
+assert.equal(reopened.Data.activeAccount(), 'ur456', 'An unconfigured URL profile falls back to the saved profile');
 reopened.window.CONFIG = {...config, imdbAccounts: [{id: 'ur123'}]};
 vm.runInNewContext(dataScript, reopened);
 assert.equal(reopened.Data.activeAccount(), 'ur123');
